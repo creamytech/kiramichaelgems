@@ -1,11 +1,6 @@
-export const config = { runtime: "edge" };
-
-export default async function handler(req) {
-  const headers = {
-    "Content-Type": "application/json",
-    "Access-Control-Allow-Origin": "*",
-    "Cache-Control": "s-maxage=300, stale-while-revalidate=600",
-  };
+export default async function handler(req, res) {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Cache-Control", "s-maxage=300, stale-while-revalidate=600");
 
   const sources = [
     {
@@ -22,32 +17,33 @@ export default async function handler(req) {
         return s?.gold ? { gold: s.gold, silver: s.silver, src: "metals.live" } : null;
       },
     },
-    {
-      url: "https://api.metalpriceapi.com/v1/latest?api_key=demo&base=USD&currencies=XAU,XAG",
-      parse: (d) => {
-        if (!d.rates) return null;
-        // These APIs return USD per oz as 1/rate
-        const gold = d.rates.XAU ? 1 / d.rates.XAU : null;
-        const silver = d.rates.XAG ? 1 / d.rates.XAG : null;
-        return gold ? { gold, silver, src: "metalpriceapi" } : null;
-      },
-    },
   ];
 
   for (const s of sources) {
     try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 5000);
       const r = await fetch(s.url, {
-        headers: { "User-Agent": "KMGems/1.0" },
-        signal: AbortSignal.timeout(5000),
+        headers: { "User-Agent": "KMGems/1.0", "Accept": "application/json" },
+        signal: controller.signal,
       });
+      clearTimeout(timeout);
       if (!r.ok) continue;
       const data = await r.json();
       const result = s.parse(data);
       if (result?.gold && result.gold > 500) {
-        return new Response(JSON.stringify({ gold: result.gold, silver: result.silver || null, source: result.src, ts: Date.now() }), { headers });
+        return res.status(200).json({
+          gold: result.gold,
+          silver: result.silver || null,
+          source: result.src,
+          ts: Date.now(),
+        });
       }
-    } catch { continue; }
+    } catch (e) {
+      console.log(`Source ${s.url} failed:`, e.message);
+      continue;
+    }
   }
 
-  return new Response(JSON.stringify({ error: "All sources unavailable" }), { status: 502, headers });
+  return res.status(502).json({ error: "All price sources failed", ts: Date.now() });
 }
