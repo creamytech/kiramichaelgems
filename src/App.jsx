@@ -1222,7 +1222,9 @@ export default function App() {
       fontFamily:"Georgia,'Times New Roman',serif",padding:24,
     }}>
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:24}}>
-        <Icon name={activeSellerData?.emoji||"Diamond2"} size={28} color={T.accent}/>
+        <div style={{width:40,height:40,borderRadius:"50%",background:T.goldGradient,display:"flex",alignItems:"center",justifyContent:"center"}}>
+          <Icon name={activeSellerData?.emoji||"Diamond2"} size={22} color="#fff"/>
+        </div>
         <span style={{fontSize:18,fontWeight:700,color:T.text}}>Hey {activeSellerData?.name}!</span>
       </div>
       <div style={{fontSize:22,fontWeight:700,color:T.text,marginBottom:4}}>What show are you at?</div>
@@ -1331,7 +1333,9 @@ export default function App() {
               display:"flex",alignItems:"center",gap:4,flexShrink:0,
               fontSize:12,fontWeight:600,color:T.accent,fontFamily:"Georgia,serif",whiteSpace:"nowrap",
             }}>
-              <Icon name={activeSellerData.emoji||"Diamond2"} size={15} color={T.accent}/>
+              <div style={{width:20,height:20,borderRadius:"50%",background:T.accent,display:"inline-flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                <Icon name={activeSellerData.emoji||"Diamond2"} size={12} color="#fff"/>
+              </div>
               {activeSellerData.name}
             </button>
           )}
@@ -2475,10 +2479,9 @@ export default function App() {
                     display:"flex",justifyContent:"space-between",alignItems:"center",
                   }}>
                     <div style={{display:"flex",alignItems:"center",gap:12}}>
-                      <div style={{width:36,height:36,borderRadius:"50%",background:i===0&&s.orders>0?T.goldGradient:T.border,
-                        color:i===0&&s.orders>0?"#fff":T.dim,display:"flex",alignItems:"center",justifyContent:"center",
-                        fontSize:16,fontWeight:700,flexShrink:0}}>
-                        <Icon name={s.emoji||"Diamond2"} size={18} color={i===0&&s.orders>0?"#fff":T.dim}/>
+                      <div style={{width:36,height:36,borderRadius:"50%",background:i===0&&s.orders>0?T.goldGradient:T.accent+"20",
+                        display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                        <Icon name={s.emoji||"Diamond2"} size={18} color={i===0&&s.orders>0?"#fff":T.accent}/>
                       </div>
                       <div>
                         <div style={{fontSize:15,fontWeight:700,color:T.text}}>
