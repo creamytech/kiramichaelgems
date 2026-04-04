@@ -1,9 +1,9 @@
 -- ═══════════════════════════════════════════════════════════════════════════
--- Kiramichael Gems — Full Schema (drop & recreate)
--- Run this in Supabase SQL Editor. It's safe to run multiple times.
+-- Kiramichael Gems — Full Schema v3 (drop & recreate)
+-- Run this in Supabase SQL Editor. Safe to run multiple times.
+-- IMPORTANT: This will delete all existing data. Back up first if needed.
 -- ═══════════════════════════════════════════════════════════════════════════
 
--- Drop existing tables if they exist (clean slate)
 DROP TABLE IF EXISTS orders CASCADE;
 DROP TABLE IF EXISTS templates CASCADE;
 DROP TABLE IF EXISTS items CASCADE;
@@ -12,41 +12,43 @@ DROP TABLE IF EXISTS inventory CASCADE;
 DROP TABLE IF EXISTS shows CASCADE;
 DROP TABLE IF EXISTS sellers CASCADE;
 
--- ─── Sellers / Profiles ──────────────────────────────────────────────────────
+-- ─── Sellers / Profiles ─────────────────────────────────────────────────────
 CREATE TABLE sellers (
   id          BIGSERIAL PRIMARY KEY,
+  record_id   TEXT UNIQUE NOT NULL,
   data        JSONB NOT NULL,
-  updated_at  TIMESTAMPTZ DEFAULT now()
+  created_at  TIMESTAMPTZ DEFAULT now()
 );
 
 -- ─── Shows / Events ─────────────────────────────────────────────────────────
 CREATE TABLE shows (
   id          BIGSERIAL PRIMARY KEY,
+  record_id   TEXT UNIQUE NOT NULL,
   data        JSONB NOT NULL,
-  updated_at  TIMESTAMPTZ DEFAULT now()
+  created_at  TIMESTAMPTZ DEFAULT now()
 );
 
 -- ─── Orders ─────────────────────────────────────────────────────────────────
 CREATE TABLE orders (
   id          BIGSERIAL PRIMARY KEY,
+  record_id   TEXT UNIQUE NOT NULL,
   data        JSONB NOT NULL,
-  record_id   TEXT,
   created_at  TIMESTAMPTZ DEFAULT now()
 );
 
 -- ─── Templates ──────────────────────────────────────────────────────────────
 CREATE TABLE templates (
   id          BIGSERIAL PRIMARY KEY,
+  record_id   TEXT UNIQUE NOT NULL,
   data        JSONB NOT NULL,
-  record_id   TEXT,
   created_at  TIMESTAMPTZ DEFAULT now()
 );
 
 -- ─── Custom Items ───────────────────────────────────────────────────────────
 CREATE TABLE items (
   id          BIGSERIAL PRIMARY KEY,
+  record_id   TEXT UNIQUE NOT NULL,
   data        JSONB NOT NULL,
-  record_id   TEXT,
   created_at  TIMESTAMPTZ DEFAULT now()
 );
 
@@ -65,8 +67,6 @@ CREATE TABLE inventory (
 );
 
 -- ─── Enable RLS with public access ──────────────────────────────────────────
--- (No auth required — all access via anon key)
-
 ALTER TABLE sellers   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE shows     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE orders    ENABLE ROW LEVEL SECURITY;
@@ -75,10 +75,8 @@ ALTER TABLE items     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE settings  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE inventory ENABLE ROW LEVEL SECURITY;
 
--- Public access policies for all tables
 DO $$
-DECLARE
-  t TEXT;
+DECLARE t TEXT;
 BEGIN
   FOR t IN SELECT unnest(ARRAY['sellers','shows','orders','templates','items','settings','inventory'])
   LOOP
@@ -89,6 +87,6 @@ BEGIN
   END LOOP;
 END $$;
 
--- Seed settings and inventory with empty row so upsert works
+-- Seed single-row tables
 INSERT INTO settings (id, data) VALUES (1, '{}') ON CONFLICT (id) DO NOTHING;
 INSERT INTO inventory (id, data) VALUES (1, '{}') ON CONFLICT (id) DO NOTHING;

@@ -24,7 +24,6 @@ export const getDebugInfo = () => ({
   initError: _initError,
 });
 
-// ─── Local storage fallback ─────────────────────────────────────────────────
 const local = {
   get(k) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : null; } catch { return null; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
@@ -48,7 +47,7 @@ export async function dbLoad(table) {
     if (!SINGLE_ROW.has(table)) q = q.order("id", { ascending: false });
     const { data, error } = await q;
     if (error) {
-      console.warn(`dbLoad(${table}) error:`, error.message, error.code, error.hint);
+      console.warn(`dbLoad(${table}) error:`, error.message, error.code);
       throw error;
     }
     if (!data || data.length === 0) return local.get(key);
@@ -67,22 +66,10 @@ export async function dbLoad(table) {
   }
 }
 
-// Test connection
-export async function testConnection() {
-  if (!_supabase) return { ok: false, error: "Client not initialized", debug: getDebugInfo() };
-  try {
-    const { data, error } = await _supabase.from("settings").select("id").limit(1);
-    if (error) return { ok: false, error: error.message, code: error.code, hint: error.hint, debug: getDebugInfo() };
-    return { ok: true, rows: data?.length ?? 0, debug: getDebugInfo() };
-  } catch (err) {
-    return { ok: false, error: err.message, debug: getDebugInfo() };
-  }
-}
-
-// ─── Save ───────────────────────────────────────────────────────────────────
+// ─── Save (merge strategy for list tables) ──────────────────────────────────
 export async function dbSave(table, value) {
   const key = KEY[table];
-  local.set(key, value); // always cache locally first
+  local.set(key, value);
 
   if (!_supabase) return;
 
@@ -93,22 +80,100 @@ export async function dbSave(table, value) {
         .upsert({ id: 1, data: value, updated_at: new Date().toISOString() });
       if (error) throw error;
     } else {
-      // Delete all then re-insert (simple & reliable for small datasets)
-      await _supabase.from(table).delete().gte("id", 0);
-      if (Array.isArray(value) && value.length > 0) {
-        // Batch insert in chunks of 50 to avoid payload limits
-        for (let i = 0; i < value.length; i += 50) {
-          const chunk = value.slice(i, i + 50).map((item, idx) => ({
+      // MERGE strategy: fetch existing from cloud, merge with local, write back
+      const { data: existing } = await _supabase.from(table).select("record_id, id").catch(() => ({ data: [] }));
+      const existingIds = new Set((existing || []).map(r => r.record_id));
+
+      // Build the full list: local items are the source of truth for items we know about
+      const localIds = new Set();
+      const toUpsert = [];
+
+      if (Array.isArray(value)) {
+        value.forEach(item => {
+          const rid = String(item.id || "");
+          localIds.add(rid);
+          toUpsert.push({
+            record_id: rid,
             data: item,
-            record_id: String(item.id || (i + idx)),
             created_at: item.date || item.createdAt || new Date().toISOString(),
-          }));
-          const { error } = await _supabase.from(table).insert(chunk);
-          if (error) throw error;
+          });
+        });
+      }
+
+      // Delete items that exist in cloud but were deleted locally
+      const toDelete = [...existingIds].filter(rid => !localIds.has(rid));
+      if (toDelete.length > 0) {
+        await _supabase.from(table).delete().in("record_id", toDelete);
+      }
+
+      // Upsert all local items (insert or update by record_id)
+      if (toUpsert.length > 0) {
+        for (let i = 0; i < toUpsert.length; i += 50) {
+          const chunk = toUpsert.slice(i, i + 50);
+          const { error } = await _supabase.from(table).upsert(chunk, {
+            onConflict: "record_id",
+          });
+          if (error) {
+            // Fallback: delete all and reinsert if upsert fails (schema might not have unique constraint)
+            console.warn(`Upsert failed for ${table}, using replace:`, error.message);
+            await _supabase.from(table).delete().gte("id", 0);
+            for (let j = 0; j < toUpsert.length; j += 50) {
+              await _supabase.from(table).insert(toUpsert.slice(j, j + 50));
+            }
+            break;
+          }
         }
       }
     }
   } catch (err) {
     console.warn(`dbSave(${table}) failed:`, err.message);
+  }
+}
+
+// ─── Full sync: merge cloud + local ─────────────────────────────────────────
+export async function dbMergeLoad(table) {
+  const key = KEY[table];
+  if (!_supabase) return local.get(key);
+  if (SINGLE_ROW.has(table)) return dbLoad(table);
+
+  try {
+    const cloudData = await dbLoad(table);
+    const localData = local.get(key);
+
+    if (!cloudData?.length && !localData?.length) return null;
+    if (!cloudData?.length) return localData;
+    if (!localData?.length) return cloudData;
+
+    // Merge: use record ID as key, prefer most recent
+    const merged = new Map();
+    // Cloud first
+    (cloudData || []).forEach(item => {
+      const id = String(item.id || "");
+      if (id) merged.set(id, item);
+    });
+    // Local overwrites cloud for items we have locally
+    (localData || []).forEach(item => {
+      const id = String(item.id || "");
+      if (id) merged.set(id, item);
+    });
+
+    const result = [...merged.values()];
+    local.set(key, result);
+    return result;
+  } catch (err) {
+    console.warn(`dbMergeLoad(${table}) failed:`, err.message);
+    return local.get(key);
+  }
+}
+
+// ─── Test connection ────────────────────────────────────────────────────────
+export async function testConnection() {
+  if (!_supabase) return { ok: false, error: "Client not initialized", debug: getDebugInfo() };
+  try {
+    const { data, error } = await _supabase.from("settings").select("id").limit(1);
+    if (error) return { ok: false, error: error.message, code: error.code, hint: error.hint, debug: getDebugInfo() };
+    return { ok: true, rows: data?.length ?? 0, debug: getDebugInfo() };
+  } catch (err) {
+    return { ok: false, error: err.message, debug: getDebugInfo() };
   }
 }
