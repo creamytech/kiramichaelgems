@@ -48,9 +48,10 @@ export default function App() {
   const [discountType,  setDiscountType]  = useState("%");
 
   useEffect(() => {
-    async function init() {
+    const splashMin = new Promise(r => setTimeout(r, 1800)); // Show splash at least 1.8s
+
+    async function loadData() {
       try {
-        // Try Supabase first, fall back to localStorage
         const [r, t, c, s, inv] = await Promise.all([
           dbLoad("orders").catch(() => null),
           dbLoad("templates").catch(() => null),
@@ -72,14 +73,12 @@ export default function App() {
         if (inv_)       setInventory(inv_);
         else { setInventory({...INITIAL_STOCK}); dbSave("inventory", {...INITIAL_STOCK}).catch(()=>{}); }
 
-        // Cache locally
         if (records_)   store.set("km-builds", records_);
         if (templates_) store.set("km-templates", templates_);
         if (items_)     store.set("km-custom", items_);
         if (settings_)  store.set("km-settings", settings_);
         if (inv_)       store.set("km-inventory", inv_);
       } catch (err) {
-        // Total fallback: just load from localStorage
         console.warn("Init failed, using localStorage:", err);
         const r = store.get("km-builds");    if (r) setRecords(r);
         const t = store.get("km-templates"); if (t) setTemplates(t);
@@ -89,9 +88,10 @@ export default function App() {
         if (inv) setInventory(inv);
         else setInventory({...INITIAL_STOCK});
       }
-      setLoading(false);
     }
-    init();
+
+    // Wait for BOTH the minimum splash time AND data loading
+    Promise.all([splashMin, loadData()]).then(() => setLoading(false));
   }, []);
 
   const saveSettings = s => { setSettings(s); store.set("km-settings",s); dbSave("settings",s); };
@@ -498,7 +498,7 @@ export default function App() {
 
   if (loading) return (
     <div style={{
-      minHeight:"100vh",background:"linear-gradient(145deg, #FAF8F4 0%, #F5EDDA 40%, #F0E5CC 70%, #FAF8F4 100%)",
+      minHeight:"100vh",background:"linear-gradient(145deg, #FAFAFD 0%, #F3EAFA 40%, #EDE2F6 70%, #FAFAFD 100%)",
       display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
       fontFamily:"Georgia,'Times New Roman',serif",
     }}>
