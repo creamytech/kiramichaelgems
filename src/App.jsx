@@ -1069,28 +1069,25 @@ export default function App() {
       <div style={{fontSize:24,fontWeight:700,color:T.text,marginBottom:4}}>Who's selling today?</div>
       {isOnline() && (
         <button onClick={async ()=>{
+          if (!supabase) { showToast("Not connected to cloud", "info"); return; }
           showToast("Syncing...", "info");
           if (sellers.length > 0) {
-            // This device has profiles — push them to cloud
-            // Use simple delete+insert to avoid upsert issues
-            try {
-              await supabase.from("sellers").delete().gte("id", 0);
-              const rows = sellers.map(s => ({ record_id: String(s.id), data: s }));
-              await supabase.from("sellers").insert(rows);
-              showToast(`Pushed ${sellers.length} profiles to cloud!`);
-            } catch(e) { showToast("Push failed: " + e.message, "info"); }
+            const { error: delErr } = await supabase.from("sellers").delete().gte("id", 0);
+            if (delErr) { showToast("Delete failed: " + delErr.message, "info"); return; }
+            const rows = sellers.map(s => ({ record_id: String(s.id), data: s }));
+            const { error: insErr } = await supabase.from("sellers").insert(rows);
+            if (insErr) { showToast("Insert failed: " + insErr.message, "info"); return; }
+            showToast(`Pushed ${sellers.length} profile${sellers.length>1?"s":""}!`);
           } else {
-            // This device has no profiles — pull from cloud
-            try {
-              const { data } = await supabase.from("sellers").select("data");
-              if (data && data.length) {
-                const profiles = data.map(r => r.data);
-                setSellers(profiles); store.set("km-sellers", profiles);
-                showToast(`Found ${profiles.length} profiles!`);
-              } else {
-                showToast("No profiles in cloud — create one below");
-              }
-            } catch(e) { showToast("Sync failed: " + e.message, "info"); }
+            const { data, error } = await supabase.from("sellers").select("data");
+            if (error) { showToast("Pull failed: " + error.message, "info"); return; }
+            if (data && data.length) {
+              const profiles = data.map(r => r.data);
+              setSellers(profiles); store.set("km-sellers", profiles);
+              showToast(`Found ${profiles.length} profile${profiles.length>1?"s":""}!`);
+            } else {
+              showToast("No profiles in cloud yet — push from another device first");
+            }
           }
         }} className="km-btn-press" style={{...btnGhost(false,{padding:"8px 16px",fontSize:13,marginBottom:12,display:"flex",alignItems:"center",gap:6})}}>
           <Icon name="Save" size={14}/>{sellers.length > 0 ? "Push profiles to cloud" : "Pull profiles from cloud"}
