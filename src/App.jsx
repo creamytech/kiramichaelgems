@@ -42,6 +42,7 @@ export default function App() {
   const [buildName,     setBuildName]     = useState("");
   const [customerName,  setCustomerName]  = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
   const [orderDate,     setOrderDate]     = useState(todayStr());
   const [buildNotes,    setBuildNotes]    = useState("");
   const [discount,      setDiscount]      = useState(0);
@@ -180,7 +181,7 @@ export default function App() {
     const rec = {
       id:Date.now(), date:orderDate,
       buildName:buildName.trim()||"Custom Build",
-      customer:customerName.trim(), email:customerEmail.trim(),
+      customer:customerName.trim(), email:customerEmail.trim(), phone:customerPhone.trim(),
       markup, labor, pieces, discount, discountType,
       notes:buildNotes.trim(),
       lines:totals.lines.map(l=>({name:l.name,metal:l.metal,unit:l.unit,price:l.price,qty:l.qty,lineCost:l.lineCost})),
@@ -204,7 +205,7 @@ export default function App() {
     setFlash("saved"); setTimeout(()=>setFlash(""),2500);
     showToast("Order saved — heading to checkout");
     setCheckoutRec(rec);
-    setBuildItems([]); setCustomerName(""); setCustomerEmail("");
+    setBuildItems([]); setCustomerName(""); setCustomerEmail(""); setCustomerPhone("");
     setBuildName(""); setBuildNotes(""); setPieces(1); setDiscount(0);
     setTab("checkout");
   }
@@ -225,7 +226,7 @@ export default function App() {
     setBuildItems(t.items);
     setBuildName(t.name); setMarkup(t.markup??2.5); setLabor(t.labor??0);
     setDiscountType(t.discountType??"%"); setDiscount(0); setBuildNotes(t.notes??"");
-    setCustomerName(""); setCustomerEmail(""); setOrderDate(todayStr());
+    setCustomerName(""); setCustomerEmail(""); setCustomerPhone(""); setOrderDate(todayStr());
     if (R.isMobile) setShowBrowser(false);
   }
 
@@ -257,7 +258,7 @@ export default function App() {
     setBuildItems(items);
     setBuildName(rec.buildName);
     setCustomerName(rec.customer);
-    setCustomerEmail(rec.email || "");
+    setCustomerEmail(rec.email || ""); setCustomerPhone(rec.phone || "");
     setOrderDate(rec.date);
     setMarkup(rec.markup);
     setLabor(rec.labor || 0);
@@ -396,14 +397,23 @@ export default function App() {
   ].filter(Boolean);
 
   // Email invoice generator
-  function emailInvoice(rec) {
+  function receiptText(rec) {
     const amt = rec.totalWithTax || rec.totalRetail;
     const lines = rec.lines.map(l => `  ${l.name} (${l.metal}) x${l.qty} — $${fmt(l.lineCost)}`).join("\n");
-    const subject = encodeURIComponent(`Invoice: ${rec.buildName} — ${settings.bizName}`);
-    const body = encodeURIComponent(
-      `${settings.bizName}\nInvoice — ${rec.date}\n\nCustomer: ${rec.customer}\nBuild: ${rec.buildName}\n\nItems:\n${lines}\n\nSubtotal: $${fmt(rec.totalRetail)}${rec.taxAmt>0?`\nTax: $${fmt(rec.taxAmt)}`:""}${rec.discountAmt>0?`\nDiscount: -$${fmt(rec.discountAmt)}`:""}\n\nTotal Due: $${fmt(amt)}\n${rec.notes?`\nNote: ${rec.notes}\n`:""}\nThank you for your purchase!`
-    );
+    return `${settings.bizName}\n${rec.paid?"Receipt":"Invoice"} — ${rec.date}\n\nCustomer: ${rec.customer}\nBuild: ${rec.buildName}\n\nItems:\n${lines}\n\nSubtotal: $${fmt(rec.totalRetail)}${(rec.taxAmt||0)>0?`\nTax: $${fmt(rec.taxAmt)}`:""}${(rec.discountAmt||0)>0?`\nDiscount: -$${fmt(rec.discountAmt)}`:""}\n\n${rec.paid?"Amount Paid":"Total Due"}: $${fmt(amt)}${rec.notes?`\n\nNote: ${rec.notes}`:""}\n\nThank you for your purchase! 💜`;
+  }
+
+  function emailInvoice(rec) {
+    const amt = rec.totalWithTax || rec.totalRetail;
+    const subject = encodeURIComponent(`${rec.paid?"Receipt":"Invoice"}: ${rec.buildName} — ${settings.bizName}`);
+    const body = encodeURIComponent(receiptText(rec));
     window.location.href = `mailto:${rec.email||""}?subject=${subject}&body=${body}`;
+  }
+
+  function textInvoice(rec) {
+    const body = encodeURIComponent(receiptText(rec));
+    const phone = (rec.phone||"").replace(/\D/g,"");
+    window.location.href = `sms:${phone}?&body=${body}`;
   }
 
   // Reorder calculator
@@ -854,7 +864,8 @@ export default function App() {
                 <div style={{display:"grid",gridTemplateColumns:R.isMobile?"1fr":"1fr 1fr",gap:12}}>
                   <div><label style={labelSt}>Build Name</label><input value={buildName} onChange={e=>setBuildName(e.target.value)} placeholder="e.g. Shell Necklace" style={inputSt()}/></div>
                   <div><label style={labelSt}>Customer Name</label><input value={customerName} onChange={e=>setCustomerName(e.target.value)} placeholder="Full name" style={inputSt()}/></div>
-                  <div><label style={labelSt}>Email (optional)</label><input value={customerEmail} onChange={e=>setCustomerEmail(e.target.value)} placeholder="email@example.com" style={inputSt()}/></div>
+                  <div><label style={labelSt}>Phone (optional)</label><input type="tel" value={customerPhone} onChange={e=>setCustomerPhone(e.target.value)} placeholder="(239) 555-0123" style={inputSt()}/></div>
+                  <div><label style={labelSt}>Email (optional)</label><input type="email" value={customerEmail} onChange={e=>setCustomerEmail(e.target.value)} placeholder="email@example.com" style={inputSt()}/></div>
                   <div><label style={labelSt}>Order Date</label><input value={orderDate} onChange={e=>setOrderDate(e.target.value)} style={inputSt()}/></div>
                 </div>
               </div>
@@ -999,178 +1010,188 @@ export default function App() {
           ) : (
             <div style={{display:"grid",gridTemplateColumns:R.isMobile?"1fr":R.isTablet?"1fr":"1fr 360px",gap:16,alignItems:"start"}}>
 
-              {/* Invoice */}
-              <div style={cardSt({padding:R.isMobile?"20px 18px":"28px 32px",borderRadius:18})}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:22,flexWrap:"wrap",gap:10}}>
+              {/* ── Beautiful Invoice ── */}
+              <div style={{...cardSt({padding:0,borderRadius:20,overflow:"hidden"})}}>
+                {/* Invoice header band */}
+                <div style={{background:T.goldGradient,padding:"20px 24px",color:"#fff"}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:8}}>
+                    <div>
+                      <div style={{fontSize:10,letterSpacing:2,textTransform:"uppercase",opacity:0.8,marginBottom:4}}>{displayRec.paid?"Receipt":"Invoice"}</div>
+                      <div style={{fontSize:R.isMobile?18:22,fontWeight:700,letterSpacing:0.3}}>{displayRec.buildName}</div>
+                    </div>
+                    <div style={{textAlign:"right"}}>
+                      <div style={{fontSize:12,opacity:0.8}}>{displayRec.date}</div>
+                      <div style={{fontSize:10,marginTop:2,padding:"3px 10px",borderRadius:20,background:displayRec.paid?"rgba(255,255,255,0.25)":"rgba(0,0,0,0.15)",fontWeight:700}}>
+                        {displayRec.paid?"PAID":"UNPAID"}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                {/* Customer info */}
+                <div style={{padding:"16px 24px",borderBottom:`1px solid ${T.border}`,display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
                   <div>
-                    <div style={{fontSize:11,color:T.gold,letterSpacing:1.5,textTransform:"uppercase",marginBottom:5,fontWeight:600}}>Invoice</div>
-                    <div style={{fontSize:R.isMobile?19:24,fontWeight:700,color:T.text,letterSpacing:0.2}}>{displayRec.buildName}</div>
-                    <div style={{fontSize:15,color:T.sub,marginTop:4}}>{displayRec.customer}</div>
-                    {displayRec.email && <div style={{fontSize:13,color:T.dim,marginTop:1}}>{displayRec.email}</div>}
+                    <div style={{fontSize:11,color:T.dim,textTransform:"uppercase",letterSpacing:0.5}}>Customer</div>
+                    <div style={{fontSize:16,fontWeight:600,color:T.text,marginTop:2}}>{displayRec.customer}</div>
                   </div>
-                  <div style={{textAlign:"right"}}>
-                    <div style={{fontSize:12,color:T.dim}}>Date</div>
-                    <div style={{fontSize:15,fontWeight:600}}>{displayRec.date}</div>
-                    <span style={tagSt(displayRec.paid?T.green:T.gold,displayRec.paid?T.greenBg:T.goldLight)}>
-                      {displayRec.paid?"Paid":"Awaiting Payment"}
-                    </span>
+                  <div style={{textAlign:"right",fontSize:13,color:T.dim}}>
+                    {displayRec.phone && <div>{displayRec.phone}</div>}
+                    {displayRec.email && <div>{displayRec.email}</div>}
                   </div>
                 </div>
-
-                <div style={{overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
-                  <table style={{width:"100%",borderCollapse:"collapse",minWidth:360}}>
-                    <thead>
-                      <tr style={{borderBottom:`2px solid ${T.border}`}}>
-                        {["Item","Metal","Qty","Unit Cost","Total"].map(h=>(
-                          <th key={h} style={{padding:"7px 6px",textAlign:h==="Total"?"right":"left",fontSize:12,fontWeight:600,color:T.sub}}>{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {displayRec.lines.map((l,i)=>(
-                        <tr key={i} style={{borderBottom:`1px solid ${T.border}`,background:i%2===0?"transparent":"#FDFBF7"}}>
-                          <td style={{padding:"8px 6px",fontSize:13,color:T.text}}>{l.name}</td>
-                          <td style={{padding:"8px 6px",fontSize:12,color:T.dim}}>{l.metal}</td>
-                          <td style={{padding:"8px 6px",fontSize:12,color:T.dim}}>{l.qty} {l.unit}</td>
-                          <td style={{padding:"8px 6px",fontSize:12,color:T.dim}}>${fmt(l.price,4)}</td>
-                          <td style={{padding:"8px 6px",fontSize:13,fontWeight:600,color:T.text,textAlign:"right"}}>${fmt(l.lineCost)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                <div style={{borderTop:`2px solid ${T.border}`,paddingTop:12,marginTop:4,display:"flex",flexDirection:"column",gap:5,alignItems:"flex-end"}}>
-                  {[
-                    ["Material",`$${fmt((displayRec.materialCost||0)*displayRec.pieces)}`],
-                    [`Labor (${displayRec.pieces} pc)`,`$${fmt(displayRec.totalLabor)}`],
-                  ].map(([l,v])=>(
-                    <div key={l} style={{display:"flex",gap:32}}>
-                      <span style={{fontSize:13,color:T.sub}}>{l}</span>
-                      <span style={{fontSize:13,color:T.text}}>{v}</span>
+                {/* Line items */}
+                <div style={{padding:"0 24px"}}>
+                  {displayRec.lines.map((l,i)=>(
+                    <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 0",borderBottom:i<displayRec.lines.length-1?`1px solid ${T.border}`:"none"}}>
+                      <div>
+                        <div style={{fontSize:14,fontWeight:600,color:T.text}}>{l.name}</div>
+                        <div style={{fontSize:12,color:T.dim,marginTop:1}}>{l.metal} &middot; {l.qty} {l.unit} @ ${fmt(l.price,4)}</div>
+                      </div>
+                      <div style={{fontSize:15,fontWeight:700,color:T.text,flexShrink:0,marginLeft:12}}>${fmt(l.lineCost)}</div>
                     </div>
                   ))}
-                  {displayRec.discountAmt>0 && (
-                    <div style={{display:"flex",gap:32}}>
-                      <span style={{fontSize:13,color:T.red}}>Discount</span>
-                      <span style={{fontSize:13,color:T.red,fontWeight:600}}>-${fmt(displayRec.discountAmt)}</span>
-                    </div>
-                  )}
-                  {(displayRec.taxAmt||0)>0 && (
-                    <div style={{display:"flex",gap:32}}>
-                      <span style={{fontSize:13,color:T.sub}}>Tax</span>
-                      <span style={{fontSize:13,color:T.text}}>+${fmt(displayRec.taxAmt)}</span>
-                    </div>
-                  )}
-                  <div style={{display:"flex",gap:32,alignItems:"center",borderTop:`2px solid ${T.borderAcc}40`,paddingTop:12,marginTop:6}}>
-                    <span style={{fontSize:16,fontWeight:700}}>Total Due</span>
-                    <span style={{fontSize:24,fontWeight:700,color:T.gold,letterSpacing:0.3}}>${fmt(displayRec.totalWithTax||displayRec.totalRetail)}</span>
-                  </div>
-                  {displayRec.notes && (
-                    <div style={{width:"100%",marginTop:6,padding:"8px 12px",background:T.bg,borderRadius:8,fontSize:13,color:T.sub,fontStyle:"italic"}}>
-                      Note: {displayRec.notes}
-                    </div>
-                  )}
                 </div>
+                {/* Totals */}
+                <div style={{padding:"16px 24px",borderTop:`1px solid ${T.border}`,background:T.bg}}>
+                  {[
+                    (displayRec.pieces||1)>1 && [`${displayRec.pieces} pieces &times; ${displayRec.markup}x markup`, null],
+                    (displayRec.totalLabor||0)>0 && ["Labor", `$${fmt(displayRec.totalLabor)}`],
+                    (displayRec.discountAmt||0)>0 && ["Discount", `-$${fmt(displayRec.discountAmt)}`, T.red],
+                    (displayRec.taxAmt||0)>0 && ["Tax", `+$${fmt(displayRec.taxAmt)}`],
+                  ].filter(Boolean).map(([l,v,c])=>(
+                    <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"4px 0",fontSize:13,color:c||T.sub}}>
+                      <span>{l}</span>{v && <span style={{fontWeight:600}}>{v}</span>}
+                    </div>
+                  ))}
+                </div>
+                {/* Total due — big */}
+                <div style={{padding:"20px 24px",background:T.goldGradientLight,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <span style={{fontSize:16,fontWeight:700,color:T.text}}>{displayRec.paid?"Amount Paid":"Total Due"}</span>
+                  <span style={{fontSize:28,fontWeight:700,color:T.accent}}>${fmt(displayRec.totalWithTax||displayRec.totalRetail)}</span>
+                </div>
+                {displayRec.notes && (
+                  <div style={{padding:"12px 24px",fontSize:13,color:T.sub,fontStyle:"italic",borderTop:`1px solid ${T.border}`}}>
+                    {displayRec.notes}
+                  </div>
+                )}
               </div>
 
-              {/* Payment */}
+              {/* ── Payment / Receipt Panel ── */}
               <div style={{display:"flex",flexDirection:"column",gap:14}}>
-                <div style={cardSt({padding:"22px",borderRadius:18})}>
-                  <div style={{fontWeight:700,fontSize:16,marginBottom:6}}>Collect Payment</div>
-                  <div style={{fontSize:14,color:T.sub,marginBottom:20,padding:"12px 16px",background:T.goldGradientLight,borderRadius:10,border:`1px solid ${T.borderAcc}20`}}>
-                    Total: <strong style={{color:T.gold,fontSize:22}}>${fmt(displayRec.totalWithTax||displayRec.totalRetail)}</strong>
-                    {(displayRec.taxAmt||0)>0 && <span style={{fontSize:12,color:T.dim,marginLeft:6}}>(incl. ${fmt(displayRec.taxAmt)} tax)</span>}
-                  </div>
 
-                  {!settings.paypal && !settings.venmo && !settings.cashapp ? (
-                    <div style={{background:T.goldLight,border:`1px solid ${T.borderAcc}`,borderRadius:8,padding:"14px"}}>
-                      <p style={{margin:"0 0 10px",fontSize:14,color:T.sub}}>Add payment handles in Settings to enable QR codes.</p>
-                      <button onClick={()=>setTab("settings")} style={btnPrimary({padding:"9px 18px",fontSize:14})}>Go to Settings</button>
-                    </div>
-                  ) : (<>
-                    <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap"}}>
-                      {PAY_METHODS.map(m=>(
-                        <button key={m.key} onClick={()=>setQrMethod(qrMethod===m.key?null:m.key)} style={{
-                          flex:1, minWidth:80, padding:"10px 6px",
-                          background:qrMethod===m.key?m.bg:"#F5F0EA",
-                          color:qrMethod===m.key?"#fff":T.sub,
-                          border:`2px solid ${qrMethod===m.key?m.bg:T.border}`,
-                          borderRadius:9,cursor:"pointer",fontSize:13,fontWeight:700,
-                          display:"flex",alignItems:"center",justifyContent:"center",gap:6,
-                          transition:"all 0.15s",
-                        }}>
-                          <Icon name={m.icon} size={16} color={qrMethod===m.key?"#fff":T.sub}/>{m.label}
-                        </button>
-                      ))}
-                    </div>
+                {/* If NOT paid — show payment options */}
+                {!displayRec.paid && (
+                  <div style={cardSt({padding:"22px",borderRadius:18})}>
+                    <div style={{fontWeight:700,fontSize:16,marginBottom:16}}>Collect Payment</div>
 
-                    {qrMethod && PAY_METHODS.filter(m=>m.key===qrMethod&&m.link).map(m=>(
-                      <div key={m.key} style={{textAlign:"center"}}>
-                        <div style={{background:"#fff",borderRadius:20,padding:"24px 20px 18px",display:"inline-block",boxShadow:T.shadowLg,border:`1px solid ${T.border}`,marginBottom:14}}>
-                          <img src="/IMG_7676.jpeg" alt="KM" style={{height:36,marginBottom:12}}/>
-                          <div style={{border:`3px solid ${m.bg}`,borderRadius:14,padding:12,display:"inline-block",background:"#fff"}}>
-                            <QRBox url={m.link} size={R.isMobile?180:200}/>
-                          </div>
-                          <div style={{marginTop:12,fontSize:22,fontWeight:700,color:T.text}}>${fmt(displayRec.totalWithTax||displayRec.totalRetail)}</div>
-                          <div style={{fontSize:13,fontWeight:600,color:m.bg,marginTop:2}}>{m.label}</div>
-                          <div style={{fontSize:12,color:T.dim,marginTop:4}}>{displayRec.buildName} &middot; {displayRec.customer}</div>
-                        </div>
-                        <div style={{display:"flex",gap:8,justifyContent:"center",flexWrap:"wrap"}}>
-                          <button onClick={()=>setQrFull(true)} className="km-btn-press" style={{...btnPrimary({padding:"10px 18px",fontSize:14,background:m.bg,display:"flex",alignItems:"center",gap:7})}}>
-                            <Icon name="Expand" size={16}/>Full Screen
-                          </button>
-                          <a href={m.link} target="_blank" rel="noreferrer" style={{textDecoration:"none"}}>
-                            <button className="km-btn-press" style={btnGhost(false,{padding:"10px 18px",fontSize:14})}>Open Link</button>
-                          </a>
-                        </div>
-                        <p style={{fontSize:12,color:T.dim,marginTop:10}}>Hand your phone to the customer to scan</p>
+                    {!settings.paypal && !settings.venmo && !settings.cashapp ? (
+                      <div style={{background:T.accentLight,border:`1px solid ${T.borderAcc}40`,borderRadius:10,padding:"14px"}}>
+                        <p style={{margin:"0 0 10px",fontSize:14,color:T.sub}}>Add payment handles in Settings to enable QR codes.</p>
+                        <button onClick={()=>setTab("settings")} className="km-btn-press" style={btnPrimary({padding:"9px 18px",fontSize:14})}>Go to Settings</button>
                       </div>
-                    ))}
+                    ) : (<>
+                      <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap"}}>
+                        {PAY_METHODS.map(m=>(
+                          <button key={m.key} onClick={()=>setQrMethod(qrMethod===m.key?null:m.key)} className="km-btn-press" style={{
+                            flex:1, minWidth:80, padding:"11px 6px",
+                            background:qrMethod===m.key?m.bg:T.bg,
+                            color:qrMethod===m.key?"#fff":T.sub,
+                            border:`2px solid ${qrMethod===m.key?m.bg:T.border}`,
+                            borderRadius:10,cursor:"pointer",fontSize:13,fontWeight:700,
+                            display:"flex",alignItems:"center",justifyContent:"center",gap:6,
+                            transition:"all 0.2s cubic-bezier(0.22,1,0.36,1)",
+                          }}>
+                            <Icon name={m.icon} size={16} color={qrMethod===m.key?"#fff":T.sub}/>{m.label}
+                          </button>
+                        ))}
+                      </div>
 
-                    <button onClick={()=>{ if(window.confirm("Mark this order as paid by cash?")) markPaid(displayRec.id); }}
-                      style={{...btnGhost(false,{width:"100%",marginTop:10,padding:"11px",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",gap:8})}}>
-                      <Icon name="Cash" size={16}/>Mark as Cash Payment
-                    </button>
-                  </>)}
+                      {qrMethod && PAY_METHODS.filter(m=>m.key===qrMethod&&m.link).map(m=>(
+                        <div key={m.key} style={{textAlign:"center",animation:"km-scaleIn 0.3s cubic-bezier(0.22,1,0.36,1)"}}>
+                          <div style={{background:"#fff",borderRadius:20,padding:"24px 20px 18px",display:"inline-block",boxShadow:T.shadowLg,border:`1px solid ${T.border}`,marginBottom:14}}>
+                            <img src="/IMG_7676.jpeg" alt="KM" style={{height:36,marginBottom:12}}/>
+                            <div style={{border:`3px solid ${m.bg}`,borderRadius:14,padding:12,display:"inline-block",background:"#fff"}}>
+                              <QRBox url={m.link} size={R.isMobile?180:200}/>
+                            </div>
+                            <div style={{marginTop:12,fontSize:22,fontWeight:700,color:T.text}}>${fmt(displayRec.totalWithTax||displayRec.totalRetail)}</div>
+                            <div style={{fontSize:13,fontWeight:600,color:m.bg,marginTop:2}}>{m.label}</div>
+                            <div style={{fontSize:12,color:T.dim,marginTop:4}}>{displayRec.buildName} &middot; {displayRec.customer}</div>
+                          </div>
+                          <div style={{display:"flex",gap:8,justifyContent:"center",flexWrap:"wrap"}}>
+                            <button onClick={()=>setQrFull(true)} className="km-btn-press" style={{...btnPrimary({padding:"10px 18px",fontSize:14,background:m.bg,display:"flex",alignItems:"center",gap:7})}}>
+                              <Icon name="Expand" size={16}/>Full Screen
+                            </button>
+                            <a href={m.link} target="_blank" rel="noreferrer" style={{textDecoration:"none"}}>
+                              <button className="km-btn-press" style={btnGhost(false,{padding:"10px 18px",fontSize:14})}>Open Link</button>
+                            </a>
+                          </div>
+                          <p style={{fontSize:12,color:T.dim,marginTop:10}}>Hand your phone to the customer to scan</p>
+                        </div>
+                      ))}
+                    </>)}
 
-                  {!displayRec.paid ? (
-                    <button onClick={()=>markPaid(displayRec.id)} style={{
-                      ...btnGhost(false,{width:"100%",marginTop:10,padding:"11px",fontSize:14,borderColor:T.green,color:T.green,display:"flex",alignItems:"center",justifyContent:"center",gap:8}),
+                    <div className="km-divider-shimmer" style={{margin:"16px 0"}}/>
+
+                    <button onClick={()=>markPaid(displayRec.id)} className="km-btn-press" style={{
+                      ...btnPrimary({width:"100%",padding:"14px",fontSize:15,background:`linear-gradient(135deg, ${T.green}, #4CAF50)`,boxShadow:"0 2px 8px rgba(45,125,79,0.2)",display:"flex",alignItems:"center",justifyContent:"center",gap:8}),
                     }}>
-                      <Icon name="Check" size={16} color={T.green}/>Mark as Paid
+                      <Icon name="Check" size={18}/>Mark as Paid
                     </button>
-                  ) : (
-                    <div style={{...tagSt(T.green,T.greenBg),justifyContent:"center",padding:"12px",borderRadius:8,width:"100%",boxSizing:"border-box",marginTop:10,fontSize:14,display:"flex"}}>
-                      <Icon name="Check" size={16}/>Payment Received
+                    <button onClick={()=>{ if(window.confirm("Mark as paid by cash?")) markPaid(displayRec.id); }} className="km-btn-press"
+                      style={{...btnGhost(false,{width:"100%",marginTop:8,padding:"11px",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",gap:8})}}>
+                      <Icon name="Cash" size={16}/>Cash Payment
+                    </button>
+                  </div>
+                )}
+
+                {/* If PAID — show receipt actions */}
+                {displayRec.paid && (
+                  <div style={cardSt({padding:"22px",borderRadius:18})}>
+                    <div style={{textAlign:"center",padding:"12px 0 16px"}}>
+                      <div style={{width:48,height:48,borderRadius:"50%",background:T.greenBg,display:"inline-flex",alignItems:"center",justifyContent:"center",marginBottom:8}}>
+                        <Icon name="Check" size={24} color={T.green}/>
+                      </div>
+                      <div style={{fontSize:18,fontWeight:700,color:T.green}}>Payment Received</div>
+                      <div style={{fontSize:14,color:T.sub,marginTop:2}}>${fmt(displayRec.totalWithTax||displayRec.totalRetail)} collected</div>
                     </div>
-                  )}
 
-                  {/* Email Invoice */}
-                  <button onClick={()=>emailInvoice(displayRec)} className="km-btn-press" style={{
-                    ...btnGhost(false,{width:"100%",marginTop:10,padding:"11px",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",gap:8}),
-                  }}>
-                    <Icon name="Save" size={16}/>Send Invoice via Email
-                  </button>
+                    <div className="km-divider-shimmer" style={{margin:"12px 0"}}/>
 
-                  {/* Edit / Duplicate / Delete */}
-                  <div style={{display:"flex",gap:8,marginTop:10}}>
-                    <button onClick={()=>editOrder(displayRec)} className="km-btn-press" style={{
-                      ...btnGhost(false,{flex:1,padding:"11px",fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",gap:6}),
-                    }}>
-                      <Icon name="Edit" size={14}/>Edit Order
+                    <div style={{fontSize:13,fontWeight:700,color:T.sub,textTransform:"uppercase",letterSpacing:0.5,marginBottom:10}}>Send Receipt</div>
+                    <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                      {displayRec.phone && (
+                        <button onClick={()=>textInvoice(displayRec)} className="km-btn-press" style={{
+                          ...btnPrimary({width:"100%",padding:"13px",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",gap:8}),
+                        }}>
+                          <Icon name="Cash" size={16}/>Text Receipt to {displayRec.phone}
+                        </button>
+                      )}
+                      {displayRec.email && (
+                        <button onClick={()=>emailInvoice(displayRec)} className="km-btn-press" style={{
+                          ...btnGhost(false,{width:"100%",padding:"13px",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",gap:8}),
+                        }}>
+                          <Icon name="Save" size={16}/>Email Receipt to {displayRec.email}
+                        </button>
+                      )}
+                      {!displayRec.phone && !displayRec.email && (
+                        <p style={{fontSize:13,color:T.dim,textAlign:"center",padding:"8px 0"}}>No phone or email on file for this customer</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Edit / Duplicate / Delete — always visible */}
+                <div style={cardSt({padding:"16px",borderRadius:14})}>
+                  <div style={{display:"flex",gap:8}}>
+                    <button onClick={()=>editOrder(displayRec)} className="km-btn-press" style={{...btnGhost(false,{flex:1,padding:"11px",fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",gap:6})}}>
+                      <Icon name="Edit" size={14}/>Edit
                     </button>
-                    <button onClick={()=>duplicateOrder(displayRec)} className="km-btn-press" style={{
-                      ...btnGhost(false,{flex:1,padding:"11px",fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",gap:6}),
-                    }}>
+                    <button onClick={()=>duplicateOrder(displayRec)} className="km-btn-press" style={{...btnGhost(false,{flex:1,padding:"11px",fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",gap:6})}}>
                       <Icon name="Plus" size={14}/>Duplicate
                     </button>
+                    <button onClick={()=>{if(window.confirm(`Delete "${displayRec.buildName}"?`))deleteRecord(displayRec.id);}} className="km-btn-press" style={{...btnGhost(false,{flex:1,padding:"11px",fontSize:13,borderColor:T.red+"40",color:T.red,display:"flex",alignItems:"center",justifyContent:"center",gap:6})}}>
+                      <Icon name="Trash" size={14}/>Delete
+                    </button>
                   </div>
-                  <button onClick={()=>{if(window.confirm(`Delete "${displayRec.buildName}"?`))deleteRecord(displayRec.id);}} className="km-btn-press" style={{
-                    ...btnGhost(false,{width:"100%",marginTop:6,padding:"11px",fontSize:13,borderColor:T.red+"60",color:T.red,display:"flex",alignItems:"center",justifyContent:"center",gap:6}),
-                  }}>
-                    <Icon name="Trash" size={14}/>Delete Order
-                  </button>
                 </div>
 
                 {records.length>1 && (
