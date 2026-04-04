@@ -322,7 +322,8 @@ export default function App() {
     const lines = buildItems.map(bi => {
       const item = ALL_ITEMS.find(i=>i.id===bi.itemId);
       if (!item) return null;
-      return {...item, qty:bi.qty, lineCost:item.price*bi.qty};
+      const qty = bi.qty===""?0:bi.qty;
+      return {...item, qty:bi.qty, lineCost:item.price*qty};
     }).filter(Boolean);
     const materialCost = lines.reduce((s,l)=>s+l.lineCost,0);
     const totalLabor   = labor*pieces;
@@ -397,8 +398,14 @@ export default function App() {
     showToast(`${item.name} — ready for payment`);
   }
   function updateQty(itemId, val) {
+    if (val === "" || val === undefined) {
+      // Allow empty field while typing — store as empty string
+      setBuildItems(p=>p.map(b=>b.itemId===itemId?{...b,qty:""}:b));
+      return;
+    }
     const q = parseFloat(val);
-    if (isNaN(q)||q<=0) { setBuildItems(p=>p.filter(b=>b.itemId!==itemId)); return; }
+    if (isNaN(q)) return;
+    if (q <= 0) { setBuildItems(p=>p.filter(b=>b.itemId!==itemId)); return; }
     setBuildItems(p=>p.map(b=>b.itemId===itemId?{...b,qty:q}:b));
   }
 
@@ -1575,7 +1582,7 @@ export default function App() {
                 })()}
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8,borderTop:`1px solid ${T.border}`,paddingTop:10}}>
                   <div>
-                    <span style={{fontSize:R.isMobile?17:19,fontWeight:700,color:T.gold}}>${fmt(item.price,4)}</span>
+                    <span style={{fontSize:R.isMobile?17:19,fontWeight:700,color:T.gold}}>${fmt(item.price * 6, 2)}</span>
                     <span style={{fontSize:11,color:T.dim,marginLeft:4}}>{item.unit}</span>
                   </div>
                   <div style={{display:"flex",gap:6}}>
@@ -1685,7 +1692,7 @@ export default function App() {
                         <div style={{fontSize:10,color:T.dim,marginTop:1}}>{item.metal} &middot; <span style={{color:isLowStock(item.id)?getStock(item.id)<=0?T.red:T.accent:T.green,fontWeight:600}}>{item.unit==="each"?getStock(item.id):fmt(getStock(item.id),1)}{item.unit==="per inch"?'"':item.unit==="per gram"?"g":""}</span></div>
                       </div>
                       <div style={{textAlign:"right",flexShrink:0,marginLeft:8}}>
-                        <div style={{fontSize:12,fontWeight:700,color:T.accent}}>${fmt(item.price,4)}</div>
+                        <div style={{fontSize:12,fontWeight:700,color:T.accent}}>${fmt(item.price*6,2)}</div>
                         {inBuild && <div style={{fontSize:10,fontWeight:700,color:T.accent}}>x{inBuild.qty}</div>}
                       </div>
                     </div>
@@ -1711,19 +1718,20 @@ export default function App() {
                   </div>
                 ) : (<>
                   <div style={{display:"grid",gridTemplateColumns:`1fr ${R.isMobile?"":"80px "}100px 90px 32px`,gap:8,padding:"6px 0",borderBottom:`1px solid ${T.border}`,marginBottom:6}}>
-                    {["Item",...(!R.isMobile?["Metal"]:[]),"Qty / Unit","Cost",""].map((h,i)=>(<div key={i} style={{fontSize:12,fontWeight:600,color:T.sub}}>{h}</div>))}
+                    {["Item",...(!R.isMobile?["Metal"]:[]),"Qty / Unit","Price",""].map((h,i)=>(<div key={i} style={{fontSize:12,fontWeight:600,color:T.sub}}>{h}</div>))}
                   </div>
                   {totals.lines.map(line=>(
                     <div key={line.id} style={{display:"grid",gridTemplateColumns:`1fr ${R.isMobile?"":"80px "}100px 90px 32px`,gap:8,padding:"8px 0",borderBottom:`1px solid ${T.border}`,alignItems:"center"}}>
                       <div style={{fontSize:13,color:T.text,lineHeight:1.35}}>{line.name}{R.isMobile&&<div style={{fontSize:11,color:T.dim}}>{line.metal}</div>}</div>
                       {!R.isMobile && <div style={{fontSize:12,color:T.dim}}>{line.metal}</div>}
                       <div>
-                        <input type="number" min="0.001" step="1" value={line.qty}
+                        <input type="number" min="0.001" step="1" value={line.qty===""?"":line.qty}
                           onChange={e=>updateQty(line.id,e.target.value)}
+                          onBlur={()=>{if(line.qty===""||line.qty<=0)setBuildItems(p=>p.filter(b=>b.itemId!==line.id));}}
                           style={{...inputSt({padding:"6px 8px",fontSize:14,textAlign:"center"})}}/>
                         <div style={{fontSize:10,color:T.dim,textAlign:"center",marginTop:2}}>{line.unit}</div>
                       </div>
-                      <div style={{fontSize:14,fontWeight:700,color:T.gold,textAlign:"right"}}>${fmt(line.lineCost)}</div>
+                      <div style={{fontSize:14,fontWeight:700,color:T.gold,textAlign:"right"}}>${fmt(line.lineCost * markup)}</div>
                       <button onClick={()=>setBuildItems(p=>p.filter(b=>b.itemId!==line.id))}
                         style={{background:"none",border:`1px solid ${T.border}`,borderRadius:6,color:T.dim,cursor:"pointer",padding:"4px",display:"flex",alignItems:"center",justifyContent:"center"}}>
                         <Icon name="X" size={14}/>
@@ -1732,39 +1740,33 @@ export default function App() {
                   ))}
                   <div style={{display:"flex",justifyContent:"flex-end",paddingTop:10}}>
                     <div style={{textAlign:"right"}}>
-                      <div style={{fontSize:12,color:T.sub}}>Material cost per piece</div>
-                      <div style={{fontSize:20,fontWeight:700,color:T.gold}}>${fmt(totals.materialCost)}</div>
+                      <div style={{fontSize:12,color:T.sub}}>Retail per piece</div>
+                      <div style={{fontSize:20,fontWeight:700,color:T.gold}}>${fmt(totals.rpp)}</div>
                     </div>
                   </div>
                 </>)}
               </div>
 
-              {/* Pricing + Summary */}
+              {/* Order Options + Summary */}
               <div style={{display:"grid",gridTemplateColumns:R.isMobile?"1fr":"1fr 1fr",gap:14}}>
+                {/* Options — no cost/markup visible */}
                 <div style={cardSt({padding:"18px 20px"})}>
-                  <div style={{fontWeight:700,fontSize:16,marginBottom:16,color:T.text}}>Pricing</div>
-                  <div style={{display:"flex",flexDirection:"column",gap:13}}>
+                  <div style={{fontWeight:700,fontSize:16,marginBottom:14,color:T.text}}>Options</div>
+                  <div style={{display:"flex",flexDirection:"column",gap:12}}>
                     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-                      <div><label style={labelSt}>Pieces</label><input type="number" min="0" value={pieces} onChange={e=>setPieces(e.target.value===""?"":parseInt(e.target.value))} onBlur={()=>{if(pieces===""||isNaN(pieces)||pieces<1)setPieces(1);}} style={inputSt()}/></div>
-                      <div><label style={labelSt}>Labor / Piece ($)</label><input type="number" min="0" step="0.5" value={labor} onChange={e=>setLabor(e.target.value===""?"":parseFloat(e.target.value))} onBlur={()=>{if(labor===""||isNaN(labor))setLabor(0);}} style={inputSt()}/></div>
-                    </div>
-                    <div>
-                      <label style={labelSt}>Markup</label>
-                      <div style={{display:"flex",gap:6,marginBottom:7}}>
-                        {[2,3,4,6].map(m=>(<button key={m} onClick={()=>setMarkup(m)} style={{...btnGhost(markup===m),flex:1,padding:"8px 0",fontSize:13}}>{m}x</button>))}
-                      </div>
-                      <input type="number" step="0.1" min="0" value={markup} onChange={e=>setMarkup(e.target.value===""?"":parseFloat(e.target.value))} onBlur={()=>{if(markup===""||isNaN(markup)||markup<1)setMarkup(6);}} style={inputSt()}/>
+                      <div><label style={labelSt}>Pieces</label><input type="number" min="0" value={pieces===""?"":pieces} onChange={e=>setPieces(e.target.value===""?"":parseInt(e.target.value))} onBlur={()=>{if(pieces===""||isNaN(pieces)||pieces<1)setPieces(1);}} style={inputSt()}/></div>
+                      <div><label style={labelSt}>Labor ($)</label><input type="number" min="0" step="0.5" value={labor===""?"":labor} onChange={e=>setLabor(e.target.value===""?"":parseFloat(e.target.value))} onBlur={()=>{if(labor===""||isNaN(labor))setLabor(0);}} style={inputSt()}/></div>
                     </div>
                     <div>
                       <label style={labelSt}>Discount (optional)</label>
                       <div style={{display:"flex",gap:0,borderRadius:8,overflow:"hidden",border:`1px solid ${T.border}`,marginBottom:7}}>
-                        {["%","$"].map(t=>(<button key={t} onClick={()=>setDiscountType(t)} style={{flex:1,padding:"11px",border:"none",cursor:"pointer",fontSize:15,fontWeight:700,background:discountType===t?T.gold:"#F5F0EA",color:discountType===t?"#fff":T.sub,transition:"all 0.13s"}}>{t}</button>))}
+                        {["%","$"].map(t=>(<button key={t} onClick={()=>setDiscountType(t)} style={{flex:1,padding:"11px",border:"none",cursor:"pointer",fontSize:15,fontWeight:700,background:discountType===t?T.accent:T.bg,color:discountType===t?"#fff":T.sub,transition:"all 0.13s"}}>{t}</button>))}
                       </div>
                       <input type="number" min="0" step={discountType==="%"?1:0.5} max={discountType==="%"?100:undefined}
                         value={discount===""?"":discount} placeholder="0" onChange={e=>setDiscount(e.target.value===""?"":parseFloat(e.target.value))} onBlur={()=>{if(discount===""||isNaN(discount))setDiscount(0);}} style={inputSt()}/>
                       {discount>0 && totals.discAmt>0 && (
                         <div style={{marginTop:6,padding:"7px 10px",background:T.redBg,border:`1px solid ${T.red}20`,borderRadius:6,fontSize:13,color:T.red,fontWeight:600}}>
-                          -{discountType==="%" ? discount+"%" : "$"+fmt(discount)} off &mdash; Customer pays ${fmt(totals.totalRetail)}
+                          -{discountType==="%" ? discount+"%" : "$"+fmt(discount)} off
                         </div>
                       )}
                     </div>
@@ -1777,30 +1779,24 @@ export default function App() {
                   </div>
                 </div>
 
+                {/* Summary — customer-safe, no COGS */}
                 <div style={{...cardSt({padding:"18px 20px",border:`1.5px solid ${T.borderAcc}`})}}>
-                  <div style={{fontWeight:700,fontSize:16,marginBottom:14,color:T.text}}>Order Summary</div>
+                  <div style={{fontWeight:700,fontSize:16,marginBottom:14,color:T.text}}>Order Total</div>
                   {buildItems.length===0 ? (
-                    <p style={{color:T.dim,textAlign:"center",padding:"20px 0",fontSize:14}}>Add items to see totals</p>
+                    <p style={{color:T.dim,textAlign:"center",padding:"20px 0",fontSize:14}}>Add items to see total</p>
                   ) : (<>
                     {[
-                      ["Material / piece",     `$${fmt(totals.materialCost)}`,  false],
-                      ["Labor / piece",         `$${fmt(labor)}`,               false],
-                      ["Cost / piece",          `$${fmt(totals.materialCost+labor)}`, false],
-                      ["Markup",                `${markup}x`,                   false],
-                      ["Retail / piece",        `$${fmt(totals.rpp)}`,          true],
-                      ["Pieces",                `${pieces}`,                    false],
-                      ["Total material",        `$${fmt(totals.totalMat)}`,     false],
-                      ["Total labor",           `$${fmt(totals.totalLabor)}`,   false],
+                      ["Price / piece",         `$${fmt(totals.rpp)}`,          true],
+                      ...(pieces>1?[["Pieces",  `${pieces}`,                    false]]:[]),
+                      ...(totals.totalLabor>0?[["Labor",`$${fmt(totals.totalLabor)}`,false]]:[]),
                       ...(totals.discAmt>0?[["Discount",`-$${fmt(totals.discAmt)}`,false]]:[]),
-                      ["Total retail",          `$${fmt(totals.totalRetail)}`,  true],
+                      ["Total",                 `$${fmt(totals.totalRetail)}`,  true],
                       ...(totals.taxAmt>0?[["Tax",`+$${fmt(totals.taxAmt)}`,false]]:[]),
                       ...(totals.taxAmt>0?[["Total w/ tax",`$${fmt(totals.totalWithTax)}`,true]]:[]),
-                      ["Profit",                `$${fmt(totals.profit)}`,       true],
-                      ["Margin",                `${fmt(totals.margin,1)}%`,     false],
                     ].map(([l,v,hi])=>(
                       <div key={l} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderBottom:`1px solid ${T.border}`}}>
                         <span style={{fontSize:13,color:l==="Discount"?T.red:hi?T.text:T.sub}}>{l}</span>
-                        <span style={{fontSize:hi?17:14,fontWeight:hi?700:400,color:l==="Profit"?T.green:l==="Discount"?T.red:hi?T.gold:T.text}}>{v}</span>
+                        <span style={{fontSize:hi?17:14,fontWeight:hi?700:400,color:l==="Discount"?T.red:hi?T.gold:T.text}}>{v}</span>
                       </div>
                     ))}
                     <button onClick={saveBuild} disabled={!customerName.trim()||buildItems.length===0} className="km-btn-press" style={{
