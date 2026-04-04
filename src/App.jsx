@@ -84,8 +84,14 @@ export default function App() {
         if (templates_) setTemplates(templates_);
         if (items_)     setCustomItems(items_);
         if (settings_)  setSettings(prev => ({...prev, ...settings_}));
-        if (inv_)       setInventory(inv_);
-        else { setInventory({...INITIAL_STOCK}); dbSave("inventory", {...INITIAL_STOCK}).catch(()=>{}); }
+        if (inv_ && Object.keys(inv_).length > 0) setInventory(inv_);
+        else {
+          // No inventory anywhere — seed with invoice quantities and sync
+          const seed = {...INITIAL_STOCK};
+          setInventory(seed);
+          store.set("km-inventory", seed);
+          dbSave("inventory", seed).catch(()=>{});
+        }
         if (shows_ && shows_.length) setShows(shows_);
         const sellers_ = sl && sl.length ? sl : store.get("km-sellers");
         if (sellers_ && sellers_.length) setSellers(sellers_);
@@ -102,8 +108,8 @@ export default function App() {
         const c = store.get("km-custom");    if (c) setCustomItems(c);
         const s = store.get("km-settings");  if (s) setSettings(prev => ({...prev, ...s}));
         const inv = store.get("km-inventory");
-        if (inv) setInventory(inv);
-        else setInventory({...INITIAL_STOCK});
+        if (inv && Object.keys(inv).length > 0) setInventory(inv);
+        else { setInventory({...INITIAL_STOCK}); store.set("km-inventory",{...INITIAL_STOCK}); }
         const sh = store.get("km-shows"); if (sh) setShows(sh);
         const sl2 = store.get("km-sellers"); if (sl2) setSellers(sl2);
         const lastShow = store.get("km-activeShow");
@@ -2197,8 +2203,18 @@ export default function App() {
                   dbSave("sellers", sellers),
                 ]);
                 showToast("All data pushed to cloud!");
-              }} style={{...btnPrimary({padding:"11px 18px",fontSize:14,display:"flex",alignItems:"center",gap:8})}}>
+              }} style={{...btnPrimary({padding:"11px 18px",fontSize:14,display:"flex",alignItems:"center",gap:8,width:"100%"})}}>
                 <Icon name="Save" size={15}/>Push All Data to Cloud
+              </button>
+              <button className="km-btn-press" onClick={()=>{
+                if (window.confirm("Reset inventory to original JK Findings invoice quantities and sync to cloud?")) {
+                  setInventory({...INITIAL_STOCK});
+                  store.set("km-inventory", {...INITIAL_STOCK});
+                  dbSave("inventory", {...INITIAL_STOCK});
+                  showToast("Inventory reset to invoice quantities and synced!");
+                }
+              }} style={{...btnGhost(false,{padding:"11px 18px",fontSize:14,display:"flex",alignItems:"center",gap:8,width:"100%",marginTop:8})}}>
+                <Icon name="Tag" size={15}/>Reset Inventory to Invoice Quantities
               </button>
               <pre style={{marginTop:12,padding:10,background:T.bg,borderRadius:8,fontSize:11,color:T.dim,overflow:"auto",maxHeight:100}}>
                 {JSON.stringify(getDebugInfo(), null, 2)}
