@@ -1192,104 +1192,46 @@ export default function App() {
             </div>
           )}
 
-          {R.isMobile && (
-            <button onClick={()=>setShowBrowser(b=>!b)} style={{
-              ...btnGhost(showBrowser),width:"100%",marginBottom:12,
-              display:"flex",alignItems:"center",justifyContent:"center",gap:8,padding:"12px",
-            }}>
-              <Icon name="Plus" size={16}/>{showBrowser?"Hide Item Browser":"Browse Items to Add"}
-            </button>
-          )}
-
-          {R.isMobile && showBrowser && (
-            <div style={{...cardSt({padding:"16px",marginBottom:12})}}>
-              <input value={buildSearch} onChange={e=>setBuildSearch(e.target.value)} placeholder="Search items..." style={inputSt({fontSize:15})}/>
-              <div style={{display:"flex",gap:5,overflowX:"auto",paddingBottom:2,WebkitOverflowScrolling:"touch",marginTop:10}}>
-                {CATS.map(c=>(<button key={c} onClick={()=>setBuildCat(c)} style={{...btnGhost(buildCat===c),padding:"5px 10px",fontSize:12,whiteSpace:"nowrap",flexShrink:0}}>{c}</button>))}
-              </div>
-              <div style={{overflowY:"auto",maxHeight:300,display:"flex",flexDirection:"column",gap:5,marginTop:10}}>
-                {sidebarItems.map(item=>(
-                  <div key={item.id} onClick={()=>{addToBuild(item.id);setShowBrowser(false);}} style={{
-                    padding:"10px 12px",background:T.bg,border:`1px solid ${T.border}`,borderRadius:8,
-                    cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",
-                  }}>
-                    <div>
-                      <div style={{fontSize:13,color:T.text,lineHeight:1.3}}>{item.name}</div>
-                      <div style={{fontSize:11,color:T.dim,marginTop:1}}>{item.metal} &middot; {item.cat} &middot; <span style={{color:isLowStock(item.id)?getStock(item.id)<=0?T.red:T.accent:T.green,fontWeight:600}}>{item.unit==="each"?getStock(item.id):fmt(getStock(item.id),1)}{item.unit==="per inch"?'"':item.unit==="per gram"?"g":""}</span></div>
-                    </div>
-                    <div style={{textAlign:"right",flexShrink:0,marginLeft:10}}>
-                      <div style={{fontSize:13,fontWeight:700,color:T.gold}}>${fmt(item.price,4)}</div>
-                      <div style={{fontSize:10,color:T.dim}}>{item.unit}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
           <div style={{display:"grid",gridTemplateColumns:R.isMobile?"1fr":R.isTablet?"300px 1fr":"320px 1fr",gap:16,alignItems:"start"}}>
 
-            {!R.isMobile && (
-              <div style={{...cardSt({padding:"18px 16px"}),position:"sticky",top:88}}>
-                <div style={{fontWeight:700,fontSize:16,marginBottom:14,display:"flex",alignItems:"center",gap:8}}>
-                  <Icon name="Grid" size={16} color={T.gold}/> Add Items
-                </div>
-                <input value={buildSearch} onChange={e=>setBuildSearch(e.target.value)} placeholder="Search items..." style={inputSt({fontSize:15})}/>
-                <div style={{display:"flex",gap:5,overflowX:"auto",paddingBottom:2,WebkitOverflowScrolling:"touch",marginTop:10}}>
-                  {CATS.map(c=>(<button key={c} onClick={()=>setBuildCat(c)} style={{...btnGhost(buildCat===c),padding:"5px 10px",fontSize:12,whiteSpace:"nowrap",flexShrink:0}}>{c}</button>))}
-                </div>
-                <div style={{overflowY:"auto",maxHeight:440,display:"flex",flexDirection:"column",gap:5,marginTop:10}}>
-                  {sidebarItems.map(item=>(
+            {/* Item Browser — sidebar on desktop, inline on mobile */}
+            <div style={{...cardSt({padding:"16px"}),position:R.isMobile?"static":"sticky",top:88}}>
+              <div style={{fontWeight:700,fontSize:15,marginBottom:10,display:"flex",alignItems:"center",gap:8}}>
+                <Icon name="Grid" size={16} color={T.accent}/> Add Items
+                {buildItems.length>0 && <span style={tagSt(T.green,T.greenBg)}>{buildItems.length} added</span>}
+              </div>
+              <input value={buildSearch} onChange={e=>setBuildSearch(e.target.value)} placeholder="Search items..." style={inputSt({fontSize:15})}/>
+              <div style={{display:"flex",gap:5,overflowX:"auto",paddingBottom:2,WebkitOverflowScrolling:"touch",marginTop:8}}>
+                {CATS.map(c=>(<button key={c} onClick={()=>setBuildCat(c)} className="km-btn-press" style={{...btnGhost(buildCat===c),padding:"5px 10px",fontSize:12,whiteSpace:"nowrap",flexShrink:0}}>{c}</button>))}
+              </div>
+              <div style={{overflowY:"auto",maxHeight:R.isMobile?240:440,display:"flex",flexDirection:"column",gap:4,marginTop:8}}>
+                {sidebarItems.map(item=>{
+                  const inBuild = buildItems.find(b=>b.itemId===item.id);
+                  return (
                     <div key={item.id} onClick={()=>addToBuild(item.id)} style={{
-                      padding:"10px 12px",background:T.bg,border:`1px solid ${T.border}`,borderRadius:8,
-                      cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",transition:"all 0.12s",
-                    }}
-                    onMouseEnter={e=>{e.currentTarget.style.background=T.goldLight;e.currentTarget.style.borderColor=T.borderAcc;}}
-                    onMouseLeave={e=>{e.currentTarget.style.background=T.bg;e.currentTarget.style.borderColor=T.border;}}>
+                      padding:"10px 12px",background:inBuild?T.accentLight:T.bg,
+                      border:`1px solid ${inBuild?T.accent+"40":T.border}`,borderRadius:8,
+                      cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",
+                      transition:"all 0.15s",
+                    }}>
                       <div>
                         <div style={{fontSize:13,color:T.text,lineHeight:1.3}}>{item.name}</div>
-                        <div style={{fontSize:11,color:T.dim,marginTop:1}}>{item.metal} &middot; {item.cat}</div>
+                        <div style={{fontSize:11,color:T.dim,marginTop:1}}>{item.metal} &middot; {item.cat} &middot; <span style={{color:isLowStock(item.id)?getStock(item.id)<=0?T.red:T.accent:T.green,fontWeight:600}}>{item.unit==="each"?getStock(item.id):fmt(getStock(item.id),1)}{item.unit==="per inch"?'"':item.unit==="per gram"?"g":""}</span></div>
                       </div>
                       <div style={{textAlign:"right",flexShrink:0,marginLeft:10}}>
-                        <div style={{fontSize:13,fontWeight:700,color:T.gold}}>${fmt(item.price,4)}</div>
+                        <div style={{fontSize:13,fontWeight:700,color:T.accent}}>${fmt(item.price,4)}</div>
                         <div style={{fontSize:10,color:T.dim}}>{item.unit}</div>
+                        {inBuild && <div style={{fontSize:10,fontWeight:700,color:T.accent}}>x{inBuild.qty}</div>}
                       </div>
                     </div>
-                  ))}
-                </div>
+                  );
+                })}
               </div>
-            )}
+            </div>
 
             <div style={{display:"flex",flexDirection:"column",gap:14}}>
 
-              {/* Customer info */}
-              <div style={cardSt({padding:"18px 20px"})}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap",gap:8}}>
-                  <div style={{fontWeight:700,fontSize:16,color:T.text}}>Customer Info</div>
-                  {buildItems.length>0 && (
-                    <button onClick={saveAsTemplate} style={{
-                      display:"flex",alignItems:"center",gap:6,
-                      padding:"7px 14px",fontSize:13,fontWeight:600,
-                      background:tmplFlash?T.green:T.goldLight,
-                      color:tmplFlash?"#fff":buildName.trim()?T.gold:T.dim,
-                      border:`1px solid ${tmplFlash?T.green:buildName.trim()?T.borderAcc:T.border}`,
-                      borderRadius:7,cursor:"pointer",transition:"all 0.2s",
-                    }}>
-                      <Icon name="Save" size={14}/>
-                      {tmplFlash?"Saved!":buildName.trim()?"Save as Template":"Name build to save"}
-                    </button>
-                  )}
-                </div>
-                <div style={{display:"grid",gridTemplateColumns:R.isMobile?"1fr":"1fr 1fr",gap:12}}>
-                  <div><label style={labelSt}>Build Name</label><input value={buildName} onChange={e=>setBuildName(e.target.value)} placeholder="e.g. Shell Necklace" style={inputSt()}/></div>
-                  <div><label style={labelSt}>Customer Name</label><input value={customerName} onChange={e=>setCustomerName(e.target.value)} placeholder="Full name" style={inputSt()}/></div>
-                  <div><label style={labelSt}>Phone (optional)</label><input type="tel" value={customerPhone} onChange={e=>setCustomerPhone(e.target.value)} placeholder="(239) 555-0123" style={inputSt()}/></div>
-                  <div><label style={labelSt}>Email (optional)</label><input type="email" value={customerEmail} onChange={e=>setCustomerEmail(e.target.value)} placeholder="email@example.com" style={inputSt()}/></div>
-                  <div><label style={labelSt}>Order Date</label><input value={orderDate} onChange={e=>setOrderDate(e.target.value)} style={inputSt()}/></div>
-                </div>
-              </div>
-
-              {/* BOM */}
+              {/* BOM — right next to the browser */}
               <div style={cardSt({padding:"18px 20px"})}>
                 <div style={{fontWeight:700,fontSize:16,marginBottom:14,display:"flex",alignItems:"center",gap:8}}>
                   <Icon name="Tag" size={16} color={T.gold}/> Build Items
@@ -1409,6 +1351,37 @@ export default function App() {
                   </>)}
                 </div>
               </div>
+
+              {/* Customer info — last step before saving */}
+              {buildItems.length>0 && (
+              <div style={cardSt({padding:"18px 20px"})}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,flexWrap:"wrap",gap:8}}>
+                  <div style={{fontWeight:700,fontSize:16,color:T.text}}>Customer Info</div>
+                  {buildItems.length>0 && buildName.trim() && (
+                    <button onClick={saveAsTemplate} className="km-btn-press" style={{
+                      display:"flex",alignItems:"center",gap:6,
+                      padding:"7px 14px",fontSize:13,fontWeight:600,
+                      background:tmplFlash?T.green:T.accentLight,
+                      color:tmplFlash?"#fff":T.accent,
+                      border:`1px solid ${tmplFlash?T.green:T.borderAcc}`,
+                      borderRadius:7,cursor:"pointer",transition:"all 0.2s",
+                    }}>
+                      <Icon name="Save" size={14}/>
+                      {tmplFlash?"Saved!":"Save as Template"}
+                    </button>
+                  )}
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:R.isMobile?"1fr":"1fr 1fr 1fr",gap:10}}>
+                  <div><label style={labelSt}>Build Name</label><input value={buildName} onChange={e=>setBuildName(e.target.value)} placeholder="e.g. Shell Necklace" style={inputSt()}/></div>
+                  <div><label style={labelSt}>Customer Name *</label><input value={customerName} onChange={e=>setCustomerName(e.target.value)} placeholder="Full name" style={inputSt()}/></div>
+                  <div><label style={labelSt}>Phone</label><input type="tel" value={customerPhone} onChange={e=>setCustomerPhone(e.target.value)} placeholder="(239) 555-0123" style={inputSt()}/></div>
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:R.isMobile?"1fr":"1fr 1fr",gap:10,marginTop:10}}>
+                  <div><label style={labelSt}>Email</label><input type="email" value={customerEmail} onChange={e=>setCustomerEmail(e.target.value)} placeholder="email@example.com" style={inputSt()}/></div>
+                  <div><label style={labelSt}>Order Date</label><input value={orderDate} onChange={e=>setOrderDate(e.target.value)} style={inputSt()}/></div>
+                </div>
+              </div>
+              )}
             </div>
           </div>
         </div>)}
