@@ -9,7 +9,7 @@ import Icon from "./components/Icons";
 import useResponsive from "./hooks/useResponsive";
 import QRBox from "./components/QRBox";
 import ItemModal from "./components/ItemModal";
-import StripePayment from "./components/StripePayment";
+import SquarePayment from "./components/SquarePayment";
 import { supabase, dbLoad, dbSave, isOnline, testConnection, getDebugInfo } from "./lib/supabase";
 import useHaptics from "./hooks/useHaptics";
 import useRealtimeSync from "./hooks/useRealtimeSync";
@@ -138,8 +138,25 @@ export default function App() {
   const [qsPhone,       setQsPhone]       = useState("");
   const [qsEmail,       setQsEmail]       = useState("");
 
+  // Handle Square POS callback
   useEffect(() => {
-    const splashMin = new Promise(r => setTimeout(r, 1800)); // Show splash at least 1.8s
+    if (window.location.pathname === "/square-callback") {
+      const params = new URLSearchParams(window.location.search);
+      const status = params.get("data[status]") || params.get("status");
+      if (status === "ok") {
+        // Payment succeeded — mark most recent unpaid order as paid
+        const unpaid = records.find(r => !r.paid);
+        if (unpaid) markPaid(unpaid.id);
+        showToast("Square payment successful!");
+      }
+      // Clean up URL
+      window.history.replaceState({}, "", "/");
+      setTab("checkout");
+    }
+  }, []);
+
+  useEffect(() => {
+    const splashMin = new Promise(r => setTimeout(r, 1800));
 
     async function loadData() {
       try {
@@ -2023,17 +2040,15 @@ export default function App() {
                       <Icon name="Cash" size={16}/>Cash Payment
                     </button>
 
-                    {/* Stripe Card Payment */}
-                    <StripePayment
+                    {/* Square Tap to Pay */}
+                    <SquarePayment
                       amount={displayRec.totalWithTax||displayRec.totalRetail}
-                      description={`${displayRec.buildName} — KM Gems`}
+                      description={displayRec.buildName}
                       customerName={displayRec.customer}
-                      customerEmail={displayRec.email}
-                      onSuccess={(paymentId)=>{
+                      onSuccess={()=>{
                         markPaid(displayRec.id);
-                        showToast("Card payment successful!");
+                        showToast("Payment successful!");
                       }}
-                      onCancel={()=>{}}
                     />
                   </div>
                 )}
