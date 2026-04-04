@@ -12,14 +12,14 @@ body {
 }
 
 ::selection {
-  background: #E8D49A;
-  color: #2A2118;
+  background: #C58FE6;
+  color: #1A1A1A;
 }
 
 input:focus, select:focus, textarea:focus {
   outline: none;
-  border-color: #C9A84C !important;
-  box-shadow: 0 0 0 3px rgba(201,168,76,0.12), inset 0 1px 3px rgba(100,80,40,0.06) !important;
+  border-color: #9B45D4 !important;
+  box-shadow: 0 0 0 3px rgba(139,47,201,0.1), inset 0 1px 3px rgba(80,30,120,0.05) !important;
 }
 
 ::-webkit-scrollbar {
@@ -30,11 +30,11 @@ input:focus, select:focus, textarea:focus {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #D5CCB8;
+  background: #D0C4DC;
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #C2B8A0;
+  background: #B8A8C8;
 }
 
 /* Smooth page transitions */
@@ -61,7 +61,7 @@ input:focus, select:focus, textarea:focus {
 /* Card hover lift */
 .km-card-hover:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(100,80,40,0.08), 0 16px 40px rgba(100,80,40,0.12) !important;
+  box-shadow: 0 4px 12px rgba(80,30,120,0.06), 0 16px 40px rgba(80,30,120,0.1) !important;
 }
 
 /* Button press effect */
@@ -113,7 +113,7 @@ input:focus, select:focus, textarea:focus {
 
 /* Divider shimmer for premium feel */
 .km-divider-shimmer {
-  background: linear-gradient(90deg, #E8E0D4, #C9A84C, #E8E0D4);
+  background: linear-gradient(90deg, #E4E0EA, #9B45D4, #E4E0EA);
   background-size: 200% 100%;
   animation: km-shimmerBg 3s ease-in-out infinite;
   height: 1px;
@@ -127,7 +127,7 @@ button, a, input, select, textarea {
 /* Better select appearance */
 select {
   cursor: pointer;
-  background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%236B5845' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%23555555' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 12px center;
   padding-right: 32px !important;
@@ -138,5 +138,5 @@ table tbody tr {
   transition: background 0.15s ease;
 }
 table tbody tr:hover {
-  background: #FAF8F4 !important;
+  background: #F8F7FA !important;
 }

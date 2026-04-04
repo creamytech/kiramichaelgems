@@ -447,7 +447,7 @@ export default function App() {
         @keyframes km-glow { 0%,100%{filter:drop-shadow(0 0 0px rgba(139,47,201,0))} 50%{filter:drop-shadow(0 0 24px rgba(139,47,201,0.18))} }
       `}</style>
       <div style={{animation:"km-logoIn 0.8s cubic-bezier(0.4,0,0.2,1) both, km-glow 2.5s ease-in-out 0.8s infinite",marginBottom:28}}>
-        <img src="/logo.svg" alt="Kira-Michael-Gems" style={{width:240,height:"auto"}}/>
+        <img src="/logo.png" alt="Kira-Michael-Gems" style={{width:240,height:"auto"}}/>
       </div>
       <div style={{
         fontSize:13,color:T.dim,letterSpacing:3,textTransform:"uppercase",marginBottom:36,
@@ -489,7 +489,7 @@ export default function App() {
         backdropFilter:"blur(12px)", WebkitBackdropFilter:"blur(12px)",
       }}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
-          <img src="/logo.svg" alt="KM" style={{height:R.isMobile?36:42,width:"auto"}}/>
+          <img src="/logo.png" alt="KM" style={{height:R.isMobile?36:42,width:"auto"}}/>
           {!R.isMobile && <div style={{fontSize:11,color:T.dim,letterSpacing:1.2}}>
             Build Cost & Checkout Calculator
             {isOnline() && <span style={{marginLeft:8,fontSize:10,color:T.green}}>&#9679; Synced</span>}
@@ -1020,17 +1020,21 @@ export default function App() {
 
                     {qrMethod && PAY_METHODS.filter(m=>m.key===qrMethod&&m.link).map(m=>(
                       <div key={m.key} style={{textAlign:"center"}}>
-                        <div style={{background:"#fff",border:`3px solid ${m.bg}`,borderRadius:16,padding:"18px",display:"inline-block",boxShadow:`0 4px 20px ${m.bg}25`,marginBottom:12}}>
-                          <QRBox url={m.link} size={R.isMobile?200:220}/>
-                          <div style={{marginTop:10,fontSize:13,fontWeight:700,color:m.bg}}>{m.label} &middot; ${fmt(displayRec.totalRetail)}</div>
-                          <div style={{fontSize:11,color:T.dim,marginTop:2}}>{displayRec.buildName}</div>
+                        <div style={{background:"#fff",borderRadius:20,padding:"24px 20px 18px",display:"inline-block",boxShadow:T.shadowLg,border:`1px solid ${T.border}`,marginBottom:14}}>
+                          <img src="/logo.png" alt="KM" style={{height:36,marginBottom:12}}/>
+                          <div style={{border:`3px solid ${m.bg}`,borderRadius:14,padding:12,display:"inline-block",background:"#fff"}}>
+                            <QRBox url={m.link} size={R.isMobile?180:200}/>
+                          </div>
+                          <div style={{marginTop:12,fontSize:22,fontWeight:700,color:T.text}}>${fmt(displayRec.totalWithTax||displayRec.totalRetail)}</div>
+                          <div style={{fontSize:13,fontWeight:600,color:m.bg,marginTop:2}}>{m.label}</div>
+                          <div style={{fontSize:12,color:T.dim,marginTop:4}}>{displayRec.buildName} &middot; {displayRec.customer}</div>
                         </div>
                         <div style={{display:"flex",gap:8,justifyContent:"center",flexWrap:"wrap"}}>
-                          <button onClick={()=>setQrFull(true)} style={{...btnPrimary({padding:"10px 18px",fontSize:14,background:m.bg,display:"flex",alignItems:"center",gap:7})}}>
+                          <button onClick={()=>setQrFull(true)} className="km-btn-press" style={{...btnPrimary({padding:"10px 18px",fontSize:14,background:m.bg,display:"flex",alignItems:"center",gap:7})}}>
                             <Icon name="Expand" size={16}/>Full Screen
                           </button>
                           <a href={m.link} target="_blank" rel="noreferrer" style={{textDecoration:"none"}}>
-                            <button style={btnGhost(false,{padding:"10px 18px",fontSize:14})}>Open Link</button>
+                            <button className="km-btn-press" style={btnGhost(false,{padding:"10px 18px",fontSize:14})}>Open Link</button>
                           </a>
                         </div>
                         <p style={{fontSize:12,color:T.dim,marginTop:10}}>Hand your phone to the customer to scan</p>
@@ -1110,19 +1114,19 @@ export default function App() {
           {qrFull && qrMethod && PAY_METHODS.find(m=>m.key===qrMethod)?.link && (
             <div onClick={()=>setQrFull(false)} style={{position:"fixed",inset:0,zIndex:200,background:"rgba(0,0,0,0.92)",display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
               {PAY_METHODS.filter(m=>m.key===qrMethod&&m.link).map(m=>(
-                <div key={m.key} style={{background:"#fff",borderRadius:20,padding:"28px 24px 24px",textAlign:"center",maxWidth:380,width:"100%",border:`4px solid ${m.bg}`,boxShadow:`0 0 60px ${m.bg}50`}}
+                <div key={m.key} style={{background:"#fff",borderRadius:24,padding:"32px 28px 28px",textAlign:"center",maxWidth:400,width:"100%",boxShadow:`0 0 80px ${m.bg}40, 0 0 200px rgba(139,47,201,0.1)`}}
                   onClick={e=>e.stopPropagation()}>
-                  <div style={{fontSize:12,color:T.dim,letterSpacing:1,marginBottom:4}}>Kiramichael Gems</div>
+                  <img src="/logo.png" alt="Kira-Michael-Gems" style={{height:48,marginBottom:16}}/>
                   <div style={{fontSize:18,fontWeight:700,color:T.text,marginBottom:2}}>{displayRec.buildName}</div>
-                  <div style={{fontSize:15,color:T.sub,marginBottom:16}}>{displayRec.customer}</div>
-                  <div style={{background:"#fff",padding:8,borderRadius:10,display:"inline-block",marginBottom:14}}>
-                    <QRBox url={m.link} size={Math.min(280,window.innerWidth-100)}/>
+                  <div style={{fontSize:15,color:T.sub,marginBottom:20}}>{displayRec.customer}</div>
+                  <div style={{border:`3px solid ${m.bg}`,borderRadius:16,padding:12,display:"inline-block",marginBottom:16,background:"#fff"}}>
+                    <QRBox url={m.link} size={Math.min(260,window.innerWidth-120)}/>
                   </div>
-                  <div style={{fontSize:32,fontWeight:700,color:m.bg,marginBottom:4}}>${fmt(displayRec.totalRetail)}</div>
-                  <div style={{fontSize:15,color:T.sub,marginBottom:18,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+                  <div style={{fontSize:36,fontWeight:700,color:T.text,marginBottom:4}}>${fmt(displayRec.totalWithTax||displayRec.totalRetail)}</div>
+                  <div style={{fontSize:15,color:m.bg,fontWeight:600,marginBottom:20,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
                     <Icon name={m.icon} size={18} color={m.bg}/>Scan to pay with {m.label}
                   </div>
-                  <button onClick={()=>setQrFull(false)} style={btnGhost(false,{width:"100%",padding:"12px",fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",gap:8})}>
+                  <button onClick={()=>setQrFull(false)} className="km-btn-press" style={btnGhost(false,{width:"100%",padding:"12px",fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",gap:8})}>
                     <Icon name="X" size={16}/>Close
                   </button>
                 </div>
