@@ -11,6 +11,7 @@ import QRBox from "./components/QRBox";
 import ItemModal from "./components/ItemModal";
 import { supabase, dbLoad, dbSave, dbMergeLoad, isOnline, testConnection, getDebugInfo } from "./lib/supabase";
 import useHaptics from "./hooks/useHaptics";
+import useRealtimeSync from "./hooks/useRealtimeSync";
 
 const UNITS = ["each","per inch","per gram","per foot"];
 
@@ -20,6 +21,17 @@ export default function App() {
   const geoTax = useGeoTax();
   const { haptic, hapticSuccess, hapticError, hapticHeavy, hapticSelect, hapticSoft } = useHaptics();
   const netStatus = useOnlineStatus();
+
+  // Real-time sync: poll Supabase every 8s, update state when cloud changes
+  const handleSync = useCallback((table, data) => {
+    if (!data) return;
+    if (table === "orders" && Array.isArray(data))    { setRecords(data); store.set("km-builds", data); }
+    if (table === "sellers" && Array.isArray(data))   { setSellers(data); store.set("km-sellers", data); }
+    if (table === "shows" && Array.isArray(data))     { setShows(data); store.set("km-shows", data); }
+    if (table === "inventory" && typeof data==="object" && !Array.isArray(data)) { setInventory(data); store.set("km-inventory", data); }
+  }, []);
+  useRealtimeSync({ interval: 8000, onSync: handleSync });
+
   const [darkMode, setDarkMode] = useState(() => store.get("km-darkmode") || false);
   const [pwaPrompt, setPwaPrompt] = useState(null);
   const [showPwaPrompt, setShowPwaPrompt] = useState(false);
