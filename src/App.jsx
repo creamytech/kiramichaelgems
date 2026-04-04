@@ -471,13 +471,16 @@ export default function App() {
     saveSellers(u);
     setActiveSeller(s.id); store.set("km-activeSeller",s.id);
     setSellerPicker(false);
-    showToast(`Welcome, ${s.name}!`);
+    if (!activeShow) setShowPicker(true);
+    else showToast(`Welcome, ${s.name}!`);
   }
   function pickSeller(id) {
     setActiveSeller(id); store.set("km-activeSeller",id);
     setSellerPicker(false);
+    // If no show is active, prompt to pick one
+    if (!activeShow) setShowPicker(true);
     const s = sellers.find(x=>x.id===id);
-    if (s) showToast(`Hey ${s.name}! Let's sell.`);
+    if (s && activeShow) showToast(`Hey ${s.name}! Let's sell.`);
   }
   function deleteSeller(id) {
     if (!window.confirm("Delete this profile?")) return;
@@ -763,6 +766,71 @@ export default function App() {
           Skip for now
         </button>
       )}
+    </div>
+  );
+
+  // ── Show picker gate (after profile, before main app) ──────────────────────
+  if (activeSeller && !activeShow && showPicker) return (
+    <div style={{minHeight:"100vh",background:"linear-gradient(145deg, #FAFAFD 0%, #F3EAFA 40%, #EDE2F6 70%, #FAFAFD 100%)",
+      display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
+      fontFamily:"Georgia,'Times New Roman',serif",padding:24,
+    }}>
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:24}}>
+        <span style={{fontSize:28}}>{activeSellerData?.emoji}</span>
+        <span style={{fontSize:18,fontWeight:700,color:T.text}}>Hey {activeSellerData?.name}!</span>
+      </div>
+      <div style={{fontSize:22,fontWeight:700,color:T.text,marginBottom:4}}>What show are you at?</div>
+      <p style={{fontSize:14,color:T.dim,marginBottom:28}}>Pick a show or create a new one</p>
+
+      <div style={{width:"100%",maxWidth:420,display:"flex",flexDirection:"column",gap:10}}>
+        {/* Existing shows */}
+        {shows.map(s=>{
+          const ct = records.filter(r=>r.showId===s.id).length;
+          return (
+            <button key={s.id} onClick={()=>selectShow(s.id)} className="km-btn-press" style={{
+              ...cardSt({padding:"18px 20px"}),width:"100%",cursor:"pointer",
+              display:"flex",alignItems:"center",justifyContent:"space-between",
+              border:`1.5px solid ${T.border}`,textAlign:"left",background:"#fff",
+            }}>
+              <div>
+                <div style={{fontSize:16,fontWeight:700,color:T.text}}>{s.name}</div>
+                <div style={{fontSize:12,color:T.dim,marginTop:2}}>
+                  {s.location && `${s.location} · `}{s.date}{ct>0&&` · ${ct} sales`}
+                </div>
+              </div>
+              <div style={{fontSize:12,fontWeight:700,color:T.accent}}>Select →</div>
+            </button>
+          );
+        })}
+
+        {/* Create new show */}
+        <div style={{padding:"20px",borderRadius:16,background:"#fff",border:`1px solid ${T.border}`,boxShadow:T.shadow,marginTop:shows.length>0?10:0}}>
+          <div style={{fontSize:14,fontWeight:700,color:T.sub,marginBottom:10}}>Create New Show</div>
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            <input id="gate-show-name" placeholder="Show name (e.g. Cape Coral Art Fest)" style={inputSt({fontSize:16})} autoFocus/>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+              <input id="gate-show-loc" placeholder="Location" style={inputSt()}/>
+              <input id="gate-show-date" placeholder={todayStr()} style={inputSt()}/>
+            </div>
+            <button className="km-btn-press" onClick={()=>{
+              const n=document.getElementById("gate-show-name")?.value;
+              const l=document.getElementById("gate-show-loc")?.value||"";
+              const d=document.getElementById("gate-show-date")?.value||todayStr();
+              if(n?.trim()) createShow(n,l,d);
+            }} style={{...btnPrimary({width:"100%",padding:"14px",fontSize:16})}}>
+              Start Selling
+            </button>
+          </div>
+        </div>
+
+        {/* Skip — general sales */}
+        <button onClick={()=>{setShowPicker(false);showToast("Ready to sell — no show selected");}} style={{
+          background:"none",border:"none",cursor:"pointer",color:T.dim,fontSize:14,
+          marginTop:8,fontFamily:"Georgia,serif",padding:8,
+        }}>
+          Skip — just general sales
+        </button>
+      </div>
     </div>
   );
 
