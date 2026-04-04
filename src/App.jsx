@@ -18,7 +18,7 @@ export default function App() {
   const [records,    setRecords]    = useState([]);
   const [templates,  setTemplates]  = useState([]);
   const [customItems,setCustomItems]= useState([]);
-  const [settings,   setSettings]   = useState({paypal:"",venmo:"",cashapp:"",bizName:"Kiramichael Gems",taxRate:0,taxEnabled:false,priceRounding:"none",lowStockThreshold:5});
+  const [settings,   setSettings]   = useState({paypal:"",venmo:"",cashapp:"",bizName:"KM Gems",taxRate:0,taxEnabled:false,priceRounding:"none",lowStockThreshold:5});
   const [inventory,  setInventory]  = useState({});
   const [shows,      setShows]      = useState([]);     // all shows/events
   const [activeShow, setActiveShow] = useState(null);   // current show id
@@ -680,7 +680,7 @@ export default function App() {
         @keyframes km-glow { 0%,100%{filter:drop-shadow(0 0 0px rgba(139,47,201,0))} 50%{filter:drop-shadow(0 0 24px rgba(139,47,201,0.18))} }
       `}</style>
       <div style={{animation:"km-logoIn 0.8s cubic-bezier(0.4,0,0.2,1) both, km-glow 2.5s ease-in-out 0.8s infinite",marginBottom:28}}>
-        <img src="/IMG_7676.jpeg" alt="Kira-Michael-Gems" style={{width:240,height:"auto"}}/>
+        <img src="/IMG_7676.jpeg" alt="KM Gems" style={{width:240,height:"auto"}}/>
       </div>
       <div style={{
         fontSize:13,color:T.dim,letterSpacing:3,textTransform:"uppercase",marginBottom:36,
@@ -849,7 +849,7 @@ export default function App() {
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <img src="/IMG_7676.jpeg" alt="KM" style={{height:R.isMobile?40:46,width:"auto",objectFit:"contain"}}/>
           <div>
-            <div style={{fontSize:R.isMobile?14:16,fontWeight:700,color:T.text,letterSpacing:0.3}}>Kira-Michael Gems</div>
+            <div style={{fontSize:R.isMobile?14:16,fontWeight:700,color:T.text,letterSpacing:0.3}}>KM Gems</div>
             <button onClick={()=>setShowPicker(true)} style={{
               background:"none",border:"none",cursor:"pointer",padding:0,
               fontSize:12,color:activeShowData?T.accent:T.dim,fontWeight:600,fontFamily:"Georgia,serif",
@@ -1531,7 +1531,7 @@ export default function App() {
               {PAY_METHODS.filter(m=>m.key===qrMethod&&m.link).map(m=>(
                 <div key={m.key} style={{background:"#fff",borderRadius:24,padding:"32px 28px 28px",textAlign:"center",maxWidth:400,width:"100%",boxShadow:`0 0 80px ${m.bg}40, 0 0 200px rgba(139,47,201,0.1)`}}
                   onClick={e=>e.stopPropagation()}>
-                  <img src="/IMG_7676.jpeg" alt="Kira-Michael-Gems" style={{height:48,marginBottom:16}}/>
+                  <img src="/IMG_7676.jpeg" alt="KM Gems" style={{height:48,marginBottom:16}}/>
                   <div style={{fontSize:18,fontWeight:700,color:T.text,marginBottom:2}}>{displayRec.buildName}</div>
                   <div style={{fontSize:15,color:T.sub,marginBottom:20}}>{displayRec.customer}</div>
                   <div style={{border:`3px solid ${m.bg}`,borderRadius:16,padding:12,display:"inline-block",marginBottom:16,background:"#fff"}}>
@@ -2048,7 +2048,7 @@ export default function App() {
               <div>
                 <label style={labelSt}>Business Name</label>
                 <input value={settings.bizName} onChange={e=>saveSettings({...settings,bizName:e.target.value})}
-                  placeholder="Kiramichael Gems" style={inputSt()}/>
+                  placeholder="KM Gems" style={inputSt()}/>
               </div>
             </div>
             <div style={cardSt({padding:"20px"})}>
@@ -2322,7 +2322,7 @@ export default function App() {
       })()}
 
       <footer style={{textAlign:"center",padding:"24px 20px",color:T.dim,fontSize:12,borderTop:`1px solid ${T.border}`,display:R.isMobile?"none":"block",letterSpacing:0.3}}>
-        <span style={{opacity:0.7}}>Kiramichael Gems &middot; JK Findings Invoice PI26-04970 &middot; March 24, 2026</span>
+        <span style={{opacity:0.7}}>KM Gems &middot; JK Findings Invoice PI26-04970 &middot; March 24, 2026</span>
       </footer>
 
       {/* Toast notification */}
