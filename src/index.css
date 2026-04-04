@@ -8,11 +8,18 @@ body {
   margin: 0;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: #E8D49A;
+  color: #2A2118;
 }
 
 input:focus, select:focus, textarea:focus {
   outline: none;
   border-color: #C9A84C !important;
+  box-shadow: 0 0 0 3px rgba(201,168,76,0.12), inset 0 1px 3px rgba(100,80,40,0.06) !important;
 }
 
 ::-webkit-scrollbar {
@@ -25,4 +32,111 @@ input:focus, select:focus, textarea:focus {
 ::-webkit-scrollbar-thumb {
   background: #D5CCB8;
   border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #C2B8A0;
+}
+
+/* Smooth page transitions */
+@keyframes km-fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes km-slideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes km-scaleIn {
+  from { opacity: 0; transform: scale(0.97); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes km-shimmerBg {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* Card hover lift */
+.km-card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(100,80,40,0.08), 0 16px 40px rgba(100,80,40,0.12) !important;
+}
+
+/* Button press effect */
+.km-btn-press:active {
+  transform: scale(0.97) !important;
+}
+
+/* Subtle pulse for badges */
+@keyframes km-badgePulse {
+  0%, 100% { transform: translateX(12px) scale(1); }
+  50% { transform: translateX(12px) scale(1.1); }
+}
+
+/* Loading shimmer for splash */
+@keyframes km-gemFloat {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  25% { transform: translateY(-6px) rotate(-2deg); }
+  75% { transform: translateY(4px) rotate(2deg); }
+}
+
+@keyframes km-ringPulse {
+  0% { box-shadow: 0 0 0 0 rgba(168,135,42,0.25); }
+  70% { box-shadow: 0 0 0 18px rgba(168,135,42,0); }
+  100% { box-shadow: 0 0 0 0 rgba(168,135,42,0); }
+}
+
+/* Smooth tab content transitions */
+@keyframes km-tabEnter {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Bottom nav active indicator */
+@keyframes km-navDot {
+  from { width: 0; opacity: 0; }
+  to { width: 16px; opacity: 1; }
+}
+
+/* Overlay fade */
+@keyframes km-overlayIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes km-modalSlide {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Divider shimmer for premium feel */
+.km-divider-shimmer {
+  background: linear-gradient(90deg, #E8E0D4, #C9A84C, #E8E0D4);
+  background-size: 200% 100%;
+  animation: km-shimmerBg 3s ease-in-out infinite;
+  height: 1px;
+}
+
+/* Smooth transitions on all interactive elements */
+button, a, input, select, textarea {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Better select appearance */
+select {
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%236B5845' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 32px !important;
+}
+
+/* Table row hover */
+table tbody tr {
+  transition: background 0.15s ease;
+}
+table tbody tr:hover {
+  background: #FAF8F4 !important;
 }
