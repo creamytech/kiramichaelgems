@@ -447,10 +447,22 @@ export default function App() {
   }
 
   function deleteRecord(id) {
+    const rec = records.find(r=>r.id===id);
+    // Restore inventory for deleted order
+    if (rec) {
+      const inv = {...inventory};
+      rec.lines.forEach(l => {
+        const match = ALL_ITEMS.find(i => i.name === l.name && i.metal === l.metal);
+        if (match && inv[match.id] !== undefined) {
+          inv[match.id] += l.qty * (rec.pieces || 1);
+        }
+      });
+      updateInventory(inv);
+    }
     const u = records.filter(r=>r.id!==id);
     setRecords(u); store.set("km-builds",u); dbSave("orders",u);
     if (checkoutRec?.id===id) setCheckoutRec(null);
-    showToast("Order deleted", "info");
+    showToast("Order deleted — inventory restored", "info");
   }
 
   function deleteTemplate(id) {
@@ -514,16 +526,7 @@ export default function App() {
     if (!records.length) return;
     const last = records[0];
     if (!window.confirm(`Undo "${last.buildName}" for ${last.customer}? This will restore inventory and delete the order.`)) return;
-    // Restore inventory
-    const inv = { ...inventory };
-    last.lines.forEach(l => {
-      const match = ALL_ITEMS.find(i => i.name === l.name && i.metal === l.metal);
-      if (match && inv[match.id] !== undefined) {
-        inv[match.id] += l.qty * (last.pieces || 1);
-      }
-    });
-    updateInventory(inv);
-    deleteRecord(last.id);
+    deleteRecord(last.id); // deleteRecord already restores inventory
   }
 
   function saveCustomItem(form, existingId=null) {
