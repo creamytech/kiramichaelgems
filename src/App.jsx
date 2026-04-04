@@ -1010,7 +1010,7 @@ export default function App() {
   // Mobile: 5 tabs (Settings accessible from Dashboard gear icon)
   const NAV = R.isMobile ? NAV_FULL.filter(n=>n.id!=="settings") : NAV_FULL;
 
-  const mainPad = R.isMobile ? "16px 14px" : "24px 24px";
+  const mainPad = R.isMobile ? "12px 10px" : "24px 24px";
   const mainPB  = R.isMobile ? "90px" : "32px";
 
   // ════════════════════════════════════════════════════════════════════════════
@@ -1067,6 +1067,16 @@ export default function App() {
     }}>
       <img src="/IMG_7676.jpeg" alt="KM" style={{height:80,marginBottom:24}}/>
       <div style={{fontSize:24,fontWeight:700,color:T.text,marginBottom:4}}>Who's selling today?</div>
+      {sellers.length===0 && isOnline() && (
+        <button onClick={async ()=>{
+          showToast("Syncing profiles...", "info");
+          const s = await dbLoad("sellers").catch(()=>null);
+          if (s && s.length) { setSellers(s); store.set("km-sellers",s); showToast(`Found ${s.length} profiles!`); }
+          else showToast("No profiles in cloud yet — create one below");
+        }} className="km-btn-press" style={{...btnGhost(false,{padding:"8px 16px",fontSize:13,marginBottom:8,display:"flex",alignItems:"center",gap:6})}}>
+          <Icon name="Save" size={14}/>Sync profiles from cloud
+        </button>
+      )}
       <p style={{fontSize:14,color:T.dim,marginBottom:28}}>Pick your profile to track your sales</p>
 
       <div style={{width:"100%",maxWidth:400,display:"flex",flexDirection:"column",gap:10}}>
@@ -1207,38 +1217,39 @@ export default function App() {
       {/* HEADER */}
       <header style={{
         background:T.headerGradient, borderBottom:`1px solid ${T.border}`,
-        boxShadow:"0 1px 3px rgba(100,80,40,0.04), 0 4px 16px rgba(100,80,40,0.06)",
-        padding: R.isMobile ? "10px 12px" : "14px 28px",
-        display:"flex", alignItems:"center", justifyContent:"space-between", gap:8,
+        boxShadow:"0 1px 3px rgba(80,30,120,0.04), 0 2px 8px rgba(80,30,120,0.04)",
+        padding: R.isMobile ? "8px 14px" : "12px 28px",
+        display:"flex", alignItems:"center", justifyContent:"space-between", gap:10,
         position:"sticky", top:0, zIndex:100,
         backdropFilter:"blur(12px)", WebkitBackdropFilter:"blur(12px)",
       }}>
-        <div style={{display:"flex",alignItems:"center",gap:8,minWidth:0}}>
-          <img src="/IMG_7676.jpeg" alt="KM" style={{height:R.isMobile?28:40,width:"auto",objectFit:"contain",flexShrink:0}}/>
+        {/* Left: logo + text */}
+        <div style={{display:"flex",alignItems:"center",gap:10,minWidth:0,flex:1}}>
+          <img src="/IMG_7676.jpeg" alt="KM" style={{height:R.isMobile?34:42,width:"auto",objectFit:"contain",flexShrink:0}}/>
           <div style={{minWidth:0}}>
-            <div style={{display:"flex",alignItems:"center",gap:4}}>
-              <span style={{fontSize:R.isMobile?13:16,fontWeight:700,color:T.text}}>KM Gems</span>
-              {activeSellerData && (
-                <button onClick={()=>{setActiveSeller(null);store.set("km-activeSeller",null);setSellerPicker(true);}} style={{
-                  background:T.accentLight,border:"none",borderRadius:10,
-                  padding:"1px 6px",cursor:"pointer",display:"flex",alignItems:"center",gap:2,
-                  fontSize:10,fontWeight:600,color:T.accent,fontFamily:"Georgia,serif",flexShrink:0,
-                }}>
-                  <span style={{fontSize:12}}>{activeSellerData.emoji}</span>
-                  {R.isMobile ? "" : activeSellerData.name}
-                </button>
-              )}
-            </div>
+            <div style={{fontSize:R.isMobile?15:18,fontWeight:700,color:T.text,lineHeight:1.2}}>KM Gems</div>
             <button onClick={()=>setShowPicker(true)} style={{
-              background:"none",border:"none",cursor:"pointer",padding:0,
-              fontSize:10,color:activeShowData?T.accent:T.dim,fontWeight:600,fontFamily:"Georgia,serif",
-              display:"flex",alignItems:"center",gap:2,
+              background:"none",border:"none",cursor:"pointer",padding:0,marginTop:1,
+              fontSize:R.isMobile?11:12,color:activeShowData?T.accent:T.dim,fontWeight:500,fontFamily:"Georgia,serif",
+              display:"flex",alignItems:"center",gap:3,
             }}>
-              {activeShowData ? <><span style={{width:4,height:4,borderRadius:"50%",background:T.green,flexShrink:0}}/>{activeShowData.name}</> : "Tap to pick show"}
-              <Icon name="ChevronDown" size={9}/>
+              {activeShowData ? <><span style={{width:5,height:5,borderRadius:"50%",background:T.green,flexShrink:0}}/>{activeShowData.name}</> : "Tap to pick show"}
+              <Icon name="ChevronDown" size={10}/>
             </button>
           </div>
         </div>
+        {/* Right: seller profile */}
+        {activeSellerData && (
+          <button onClick={()=>{setActiveSeller(null);store.set("km-activeSeller",null);setSellerPicker(true);}} className="km-btn-press" style={{
+            background:T.accentLight,border:`1px solid ${T.accent}25`,borderRadius:20,
+            padding:R.isMobile?"5px 10px 5px 6px":"6px 14px 6px 8px",cursor:"pointer",
+            display:"flex",alignItems:"center",gap:5,flexShrink:0,
+            fontSize:R.isMobile?12:13,fontWeight:600,color:T.accent,fontFamily:"Georgia,serif",
+          }}>
+            <span style={{fontSize:R.isMobile?16:18}}>{activeSellerData.emoji}</span>
+            {activeSellerData.name}
+          </button>
+        )}
         {!R.isMobile && (
           <nav style={{display:"flex",gap:4,background:T.bg,borderRadius:12,padding:4,border:`1px solid ${T.border}`}}>
             {NAV.map(n=>(
@@ -1455,32 +1466,31 @@ export default function App() {
           <div style={{display:"grid",gridTemplateColumns:R.isMobile?"1fr":R.isTablet?"300px 1fr":"320px 1fr",gap:R.isMobile?12:16,alignItems:"start"}}>
 
             {/* Item Browser — sidebar on desktop, inline on mobile */}
-            <div style={{...cardSt({padding:"16px"}),position:R.isMobile?"static":"sticky",top:88}}>
-              <div style={{fontWeight:700,fontSize:15,marginBottom:10,display:"flex",alignItems:"center",gap:8}}>
-                <Icon name="Grid" size={16} color={T.accent}/> Add Items
-                {buildItems.length>0 && <span style={tagSt(T.green,T.greenBg)}>{buildItems.length} added</span>}
+            <div style={{...cardSt({padding:R.isMobile?"12px":"16px"}),position:R.isMobile?"static":"sticky",top:88,overflow:"hidden"}}>
+              <div style={{fontWeight:700,fontSize:14,marginBottom:8,display:"flex",alignItems:"center",gap:6}}>
+                <Icon name="Grid" size={14} color={T.accent}/> Add Items
+                {buildItems.length>0 && <span style={tagSt(T.green,T.greenBg)}>{buildItems.length}</span>}
               </div>
-              <input value={buildSearch} onChange={e=>setBuildSearch(e.target.value)} placeholder="Search items..." style={inputSt({fontSize:15})}/>
-              <div style={{display:"flex",gap:5,overflowX:"auto",paddingBottom:2,WebkitOverflowScrolling:"touch",marginTop:8}}>
-                {CATS.map(c=>(<button key={c} onClick={()=>setBuildCat(c)} className="km-btn-press" style={{...btnGhost(buildCat===c),padding:"5px 10px",fontSize:12,whiteSpace:"nowrap",flexShrink:0}}>{c}</button>))}
+              <input value={buildSearch} onChange={e=>setBuildSearch(e.target.value)} placeholder="Search items..." style={inputSt({fontSize:14})}/>
+              <div style={{display:"flex",gap:4,overflowX:"auto",paddingBottom:2,WebkitOverflowScrolling:"touch",marginTop:6,marginRight:-4}}>
+                {CATS.map(c=>(<button key={c} onClick={()=>setBuildCat(c)} className="km-btn-press" style={{...btnGhost(buildCat===c),padding:"4px 8px",fontSize:11,whiteSpace:"nowrap",flexShrink:0}}>{c}</button>))}
               </div>
-              <div style={{overflowY:"auto",maxHeight:R.isMobile?180:440,display:"flex",flexDirection:"column",gap:4,marginTop:8}}>
+              <div style={{overflowY:"auto",maxHeight:R.isMobile?160:440,display:"flex",flexDirection:"column",gap:3,marginTop:6}}>
                 {sidebarItems.map(item=>{
                   const inBuild = buildItems.find(b=>b.itemId===item.id);
                   return (
                     <div key={item.id} onClick={()=>addToBuild(item.id)} style={{
-                      padding:"10px 12px",background:inBuild?T.accentLight:T.bg,
-                      border:`1px solid ${inBuild?T.accent+"40":T.border}`,borderRadius:8,
+                      padding:"8px 10px",background:inBuild?T.accentLight:T.bg,
+                      border:`1px solid ${inBuild?T.accent+"40":T.border}`,borderRadius:7,
                       cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",
-                      transition:"all 0.15s",
+                      transition:"all 0.15s",minWidth:0,
                     }}>
-                      <div>
-                        <div style={{fontSize:13,color:T.text,lineHeight:1.3}}>{item.name}</div>
-                        <div style={{fontSize:11,color:T.dim,marginTop:1}}>{item.metal} &middot; {item.cat} &middot; <span style={{color:isLowStock(item.id)?getStock(item.id)<=0?T.red:T.accent:T.green,fontWeight:600}}>{item.unit==="each"?getStock(item.id):fmt(getStock(item.id),1)}{item.unit==="per inch"?'"':item.unit==="per gram"?"g":""}</span></div>
+                      <div style={{minWidth:0,flex:1}}>
+                        <div style={{fontSize:13,color:T.text,lineHeight:1.3,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{item.name}</div>
+                        <div style={{fontSize:10,color:T.dim,marginTop:1}}>{item.metal} &middot; <span style={{color:isLowStock(item.id)?getStock(item.id)<=0?T.red:T.accent:T.green,fontWeight:600}}>{item.unit==="each"?getStock(item.id):fmt(getStock(item.id),1)}{item.unit==="per inch"?'"':item.unit==="per gram"?"g":""}</span></div>
                       </div>
-                      <div style={{textAlign:"right",flexShrink:0,marginLeft:10}}>
-                        <div style={{fontSize:13,fontWeight:700,color:T.accent}}>${fmt(item.price,4)}</div>
-                        <div style={{fontSize:10,color:T.dim}}>{item.unit}</div>
+                      <div style={{textAlign:"right",flexShrink:0,marginLeft:8}}>
+                        <div style={{fontSize:12,fontWeight:700,color:T.accent}}>${fmt(item.price,4)}</div>
                         {inBuild && <div style={{fontSize:10,fontWeight:700,color:T.accent}}>x{inBuild.qty}</div>}
                       </div>
                     </div>
