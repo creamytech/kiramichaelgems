@@ -1360,41 +1360,75 @@ export default function App() {
       <header style={{
         background:T.headerGradient, borderBottom:`1px solid ${T.border}`,
         boxShadow:"0 1px 3px rgba(80,30,120,0.04), 0 2px 8px rgba(80,30,120,0.04)",
-        padding: R.isMobile ? "8px 14px" : "12px 28px",
-        display:"flex", alignItems:"center", justifyContent:"space-between", gap:10,
+        padding: R.isMobile ? "8px 12px" : "12px 28px",
         position:"sticky", top:0, zIndex:100,
         backdropFilter:"blur(12px)", WebkitBackdropFilter:"blur(12px)",
       }}>
-        {/* Left: logo + name + show */}
-        <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
-          <img src="/IMG_7676.jpeg" alt="KM" style={{height:R.isMobile?34:36,width:"auto",objectFit:"contain",flexShrink:0}}/>
-          <div>
-            <div style={{fontSize:R.isMobile?15:16,fontWeight:700,color:T.text,lineHeight:1.1,whiteSpace:"nowrap"}}>KM Gems</div>
+        {R.isMobile ? (
+          /* ── Mobile header: single clean row ── */
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
+            {/* Left: logo only */}
+            <img src="/IMG_7676.jpeg" alt="KM" style={{height:30,width:"auto",objectFit:"contain",flexShrink:0}}/>
+            {/* Center: show name (tappable) */}
             <button onClick={()=>setShowPicker(true)} style={{
-              background:"none",border:"none",cursor:"pointer",padding:0,marginTop:1,
-              fontSize:11,color:activeShowData?T.accent:T.dim,fontWeight:500,fontFamily:"Georgia,serif",
-              display:"flex",alignItems:"center",gap:3,whiteSpace:"nowrap",
+              background:T.bg,border:`1px solid ${T.border}`,borderRadius:20,
+              padding:"5px 12px",cursor:"pointer",flex:1,maxWidth:200,
+              display:"flex",alignItems:"center",justifyContent:"center",gap:4,
+              fontSize:13,fontWeight:600,color:T.text,fontFamily:"Georgia,serif",
             }}>
-              {activeShowData ? <><span style={{width:5,height:5,borderRadius:"50%",background:T.green,flexShrink:0}}/>{activeShowData.name}</> : "pick show"}
-              <Icon name="ChevronDown" size={9}/>
+              {activeShowData ? <><span style={{width:5,height:5,borderRadius:"50%",background:T.green,flexShrink:0}}/>{activeShowData.name}</> : <span style={{color:T.dim}}>Pick show</span>}
+              <Icon name="ChevronDown" size={10} color={T.dim}/>
             </button>
+            {/* Right: seller profile */}
+            {activeSellerData ? (
+              <button onClick={()=>{setActiveSeller(null);store.set("km-activeSeller",null);setSellerPicker(true);}} className="km-btn-press" style={{
+                background:T.accent,border:"none",borderRadius:20,
+                padding:"4px 10px 4px 4px",cursor:"pointer",
+                display:"flex",alignItems:"center",gap:5,flexShrink:0,
+                fontSize:12,fontWeight:600,color:"#fff",fontFamily:"Georgia,serif",
+              }}>
+                <div style={{width:22,height:22,borderRadius:"50%",background:"rgba(255,255,255,0.25)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                  <Icon name={activeSellerData.emoji||"Diamond2"} size={12} color="#fff"/>
+                </div>
+                {activeSellerData.name}
+              </button>
+            ) : (
+              <button onClick={()=>setSellerPicker(true)} style={{background:T.bg,border:`1px solid ${T.border}`,borderRadius:20,padding:"6px 10px",cursor:"pointer",fontSize:11,color:T.dim,fontFamily:"Georgia,serif"}}>
+                Sign in
+              </button>
+            )}
           </div>
-          {activeSellerData && (
-            <button onClick={()=>{setActiveSeller(null);store.set("km-activeSeller",null);setSellerPicker(true);}} className="km-btn-press" style={{
-              background:T.accentLight,border:`1px solid ${T.accent}20`,borderRadius:16,
-              padding:"3px 10px 3px 5px",cursor:"pointer",
-              display:"flex",alignItems:"center",gap:4,flexShrink:0,
-              fontSize:12,fontWeight:600,color:T.accent,fontFamily:"Georgia,serif",whiteSpace:"nowrap",
-            }}>
-              <div style={{width:20,height:20,borderRadius:"50%",background:T.accent,display:"inline-flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                <Icon name={activeSellerData.emoji||"Diamond2"} size={12} color="#fff"/>
+        ) : (
+          /* ── Desktop/tablet header ── */
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
+            <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
+              <img src="/IMG_7676.jpeg" alt="KM" style={{height:36,width:"auto",objectFit:"contain",flexShrink:0}}/>
+              <div>
+                <div style={{fontSize:16,fontWeight:700,color:T.text,lineHeight:1.1}}>KM Gems</div>
+                <button onClick={()=>setShowPicker(true)} style={{
+                  background:"none",border:"none",cursor:"pointer",padding:0,marginTop:1,
+                  fontSize:11,color:activeShowData?T.accent:T.dim,fontWeight:500,fontFamily:"Georgia,serif",
+                  display:"flex",alignItems:"center",gap:3,
+                }}>
+                  {activeShowData ? <><span style={{width:5,height:5,borderRadius:"50%",background:T.green,flexShrink:0}}/>{activeShowData.name}</> : "pick show"}
+                  <Icon name="ChevronDown" size={9}/>
+                </button>
               </div>
-              {activeSellerData.name}
-            </button>
-          )}
-        </div>
-        {!R.isMobile && (
-          <nav style={{display:"flex",gap:2,background:T.bg,borderRadius:10,padding:3,border:`1px solid ${T.border}`}}>
+              {activeSellerData && (
+                <button onClick={()=>{setActiveSeller(null);store.set("km-activeSeller",null);setSellerPicker(true);}} className="km-btn-press" style={{
+                  background:T.accentLight,border:`1px solid ${T.accent}20`,borderRadius:16,
+                  padding:"3px 10px 3px 5px",cursor:"pointer",
+                  display:"flex",alignItems:"center",gap:4,flexShrink:0,
+                  fontSize:12,fontWeight:600,color:T.accent,fontFamily:"Georgia,serif",
+                }}>
+                  <div style={{width:20,height:20,borderRadius:"50%",background:T.accent,display:"inline-flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                    <Icon name={activeSellerData.emoji||"Diamond2"} size={12} color="#fff"/>
+                  </div>
+                  {activeSellerData.name}
+                </button>
+              )}
+            </div>
+            <nav style={{display:"flex",gap:2,background:T.bg,borderRadius:10,padding:3,border:`1px solid ${T.border}`}}>
             {NAV.map(n=>(
               <button key={n.id} onClick={()=>{setTab(n.id);hapticSelect();}} className="km-btn-press" style={{
                 background:tab===n.id?T.card:"transparent",
@@ -1413,7 +1447,8 @@ export default function App() {
                 {n.badge>0 && <span style={{position:"absolute",top:-4,right:-4,background:n.id==="records"?T.green:T.goldGradient,color:"#fff",borderRadius:"50%",width:18,height:18,fontSize:10,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 1px 4px rgba(0,0,0,0.15)"}}>{n.badge}</span>}
               </button>
             ))}
-          </nav>
+            </nav>
+          </div>
         )}
       </header>
 
