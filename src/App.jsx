@@ -142,14 +142,11 @@ export default function App() {
   useEffect(() => {
     const squarePaid = store.get("km-square-paid");
     if (squarePaid) {
-      // Clear the flag immediately
       localStorage.removeItem("km-square-paid");
-      // Mark most recent unpaid order as paid
       const unpaid = records.find(r => !r.paid);
       if (unpaid) markPaid(unpaid.id);
       showToast("Square payment successful!");
       setTab("checkout");
-    }
     }
   }, []);
 
