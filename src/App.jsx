@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import * as XLSX from "xlsx";
-import { DEFAULT_ITEMS, CATS } from "./data/catalog";
+import { DEFAULT_ITEMS, CATS, INITIAL_STOCK } from "./data/catalog";
 import { T, fmt, todayStr, uid, store, cardSt, inputSt, labelSt, btnPrimary, btnGhost, tagSt } from "./theme";
 import Icon from "./components/Icons";
 import useResponsive from "./hooks/useResponsive";
@@ -15,7 +15,8 @@ export default function App() {
   const [records,    setRecords]    = useState([]);
   const [templates,  setTemplates]  = useState([]);
   const [customItems,setCustomItems]= useState([]);
-  const [settings,   setSettings]   = useState({paypal:"",venmo:"",cashapp:"",bizName:"Kiramichael Gems",taxRate:0,taxEnabled:false,priceRounding:"none"});
+  const [settings,   setSettings]   = useState({paypal:"",venmo:"",cashapp:"",bizName:"Kiramichael Gems",taxRate:0,taxEnabled:false,priceRounding:"none",lowStockThreshold:5});
+  const [inventory,  setInventory]  = useState({});
 
   const [tab,         setTab]         = useState("catalog");
   const [flash,       setFlash]       = useState("");
@@ -49,6 +50,9 @@ export default function App() {
     const t = store.get("km-templates"); if (t) setTemplates(t);
     const c = store.get("km-custom");    if (c) setCustomItems(c);
     const s = store.get("km-settings");  if (s) setSettings(s);
+    const inv = store.get("km-inventory");
+    if (inv) setInventory(inv);
+    else { setInventory({...INITIAL_STOCK}); store.set("km-inventory",{...INITIAL_STOCK}); }
   }, []);
 
   const saveSettings = s => { setSettings(s); store.set("km-settings",s); };
@@ -136,6 +140,15 @@ export default function App() {
       taxAmt:totals.taxAmt, totalWithTax:totals.totalWithTax,
       profit:totals.profit, margin:totals.margin, rpp:totals.rpp, paid:false,
     };
+    // Decrement inventory
+    const inv = {...inventory};
+    totals.lines.forEach(l => {
+      if (inv[l.id] !== undefined) {
+        inv[l.id] = Math.max(0, inv[l.id] - (l.qty * pieces));
+      }
+    });
+    updateInventory(inv);
+
     const updated = [rec,...records];
     setRecords(updated); store.set("km-builds",updated);
     setFlash("saved"); setTimeout(()=>setFlash(""),2500);
@@ -199,6 +212,36 @@ export default function App() {
     const u = customItems.filter(i=>i.id!==id);
     setCustomItems(u); store.set("km-custom",u);
     setBuildItems(p=>p.filter(b=>b.itemId!==id));
+  }
+
+  // ── Inventory helpers ─────────────────────────────────────────────────────
+  function updateInventory(newInv) {
+    setInventory(newInv); store.set("km-inventory",newInv);
+  }
+  function adjustStock(itemId, delta) {
+    const inv = {...inventory, [itemId]: Math.max(0, (inventory[itemId]||0) + delta)};
+    updateInventory(inv);
+  }
+  function setStock(itemId, qty) {
+    const inv = {...inventory, [itemId]: Math.max(0, qty)};
+    updateInventory(inv);
+  }
+  function resetInventory() {
+    if (window.confirm("Reset all stock to the original JK Findings invoice quantities? This cannot be undone.")) {
+      updateInventory({...INITIAL_STOCK});
+    }
+  }
+  function getStock(itemId) { return inventory[itemId] ?? 0; }
+  function isLowStock(itemId) {
+    const item = ALL_ITEMS.find(i=>i.id===itemId);
+    if (!item) return false;
+    const stock = getStock(itemId);
+    const threshold = settings.lowStockThreshold || 5;
+    // For chains (per inch), low if under 18" (one necklace)
+    if (item.unit==="per inch") return stock < 18;
+    // For per gram, low if under 5g
+    if (item.unit==="per gram") return stock < 5;
+    return stock <= threshold;
   }
 
   const displayRec = checkoutRec || records[0];
@@ -325,6 +368,35 @@ export default function App() {
               <Icon name="Plus" size={16}/> Add Item
             </button>
           </div>
+          {/* Low stock alerts */}
+          {(()=>{
+            const lowItems = ALL_ITEMS.filter(i=>isLowStock(i.id));
+            const outItems = lowItems.filter(i=>getStock(i.id)<=0);
+            const warnItems = lowItems.filter(i=>getStock(i.id)>0);
+            if (lowItems.length===0) return null;
+            return (
+              <div style={{...cardSt({padding:"14px 18px",marginBottom:14,border:`1.5px solid ${outItems.length>0?T.red+"60":"#B8860B60"}`})}}>
+                <div style={{fontSize:14,fontWeight:700,color:outItems.length>0?T.red:"#B8860B",marginBottom:8}}>
+                  {outItems.length>0 && `${outItems.length} out of stock`}
+                  {outItems.length>0 && warnItems.length>0 && " · "}
+                  {warnItems.length>0 && `${warnItems.length} running low`}
+                </div>
+                <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                  {lowItems.map(i=>(
+                    <span key={i.id} style={{
+                      fontSize:12,padding:"3px 10px",borderRadius:20,
+                      background:getStock(i.id)<=0?T.redBg:"#FFF8E1",
+                      color:getStock(i.id)<=0?T.red:"#B8860B",
+                      border:`1px solid ${getStock(i.id)<=0?T.red+"30":"#B8860B30"}`,
+                    }}>
+                      {i.name} — {getStock(i.id)<=0?"OUT":`${i.unit==="each"?getStock(i.id):fmt(getStock(i.id),1)}${i.unit==="per inch"?'"':i.unit==="per gram"?"g":""}`}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+
           <div style={{display:"flex",gap:10,marginBottom:14,flexWrap:"wrap"}}>
             <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search items..." style={{...inputSt(),flex:"1 1 180px",fontSize:15}}/>
             <button onClick={()=>setSortDir(d=>d==="asc"?"desc":"asc")} style={{...btnGhost(false),padding:"10px 14px",fontSize:13,display:"flex",alignItems:"center",gap:6}}>
@@ -349,18 +421,37 @@ export default function App() {
                   </div>
                 )}
                 <div style={{fontSize:13,color:T.text,lineHeight:1.4,marginBottom:6,paddingRight:item.isCustom?40:0}}>{item.name}</div>
-                <div style={{display:"flex",gap:6,marginBottom:10,flexWrap:"wrap"}}>
+                <div style={{display:"flex",gap:6,marginBottom:6,flexWrap:"wrap"}}>
                   <span style={tagSt()}>{item.cat}</span>
                   {item.isCustom && <span style={tagSt(T.green,T.greenBg)}>Custom</span>}
                   <span style={{fontSize:11,color:T.dim,alignSelf:"center"}}>{item.metal}</span>
                 </div>
+                {/* Stock indicator */}
+                {(()=>{
+                  const stock = getStock(item.id);
+                  const low = isLowStock(item.id);
+                  const unitLabel = item.unit==="per inch"?'"':item.unit==="per gram"?"g":"";
+                  const out = stock <= 0;
+                  return (
+                    <div style={{fontSize:12,fontWeight:600,marginBottom:8,padding:"4px 8px",borderRadius:6,
+                      background:out?T.redBg:low?"#FFF8E1":T.greenBg,
+                      color:out?T.red:low?"#B8860B":T.green,
+                      border:`1px solid ${out?T.red+"30":low?"#B8860B30":T.green+"30"}`,
+                    }}>
+                      {out ? "Out of stock" : `${item.unit==="each"?stock:fmt(stock,1)}${unitLabel} in stock`}
+                      {low && !out && " — Low"}
+                    </div>
+                  );
+                })()}
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
                   <div>
                     <span style={{fontSize:R.isMobile?17:19,fontWeight:700,color:T.gold}}>${fmt(item.price,4)}</span>
                     <span style={{fontSize:11,color:T.dim,marginLeft:4}}>{item.unit}</span>
                   </div>
                   <button onClick={()=>{addToBuild(item.id);setTab("build");}} style={{
-                    background:T.goldLight,color:T.gold,border:`1px solid ${T.borderAcc}`,
+                    background:getStock(item.id)<=0?"#F0EBE4":T.goldLight,
+                    color:getStock(item.id)<=0?T.dim:T.gold,
+                    border:`1px solid ${getStock(item.id)<=0?T.border:T.borderAcc}`,
                     borderRadius:7,padding:"6px 12px",cursor:"pointer",fontSize:13,fontWeight:600,
                     display:"flex",alignItems:"center",gap:5,
                   }}>
@@ -433,7 +524,7 @@ export default function App() {
                   }}>
                     <div>
                       <div style={{fontSize:13,color:T.text,lineHeight:1.3}}>{item.name}</div>
-                      <div style={{fontSize:11,color:T.dim,marginTop:1}}>{item.metal} &middot; {item.cat}</div>
+                      <div style={{fontSize:11,color:T.dim,marginTop:1}}>{item.metal} &middot; {item.cat} &middot; <span style={{color:isLowStock(item.id)?getStock(item.id)<=0?T.red:"#B8860B":T.green,fontWeight:600}}>{item.unit==="each"?getStock(item.id):fmt(getStock(item.id),1)}{item.unit==="per inch"?'"':item.unit==="per gram"?"g":""}</span></div>
                     </div>
                     <div style={{textAlign:"right",flexShrink:0,marginLeft:10}}>
                       <div style={{fontSize:13,fontWeight:700,color:T.gold}}>${fmt(item.price,4)}</div>
@@ -1054,6 +1145,47 @@ export default function App() {
                     padding:"8px 14px",fontSize:13,
                   }}>{label}</button>
                 ))}
+              </div>
+            </div>
+
+            {/* Inventory Management */}
+            <div style={cardSt({padding:"20px"})}>
+              <div style={{fontWeight:700,fontSize:16,marginBottom:6}}>Inventory</div>
+              <p style={{fontSize:13,color:T.sub,marginBottom:12}}>Stock auto-decrements when you save orders. Adjust manually below.</p>
+              <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap"}}>
+                <div>
+                  <label style={labelSt}>Low Stock Alert (each items)</label>
+                  <input type="number" min="1" max="50" value={settings.lowStockThreshold||5}
+                    onChange={e=>saveSettings({...settings,lowStockThreshold:parseInt(e.target.value)||5})}
+                    style={inputSt({maxWidth:100})}/>
+                </div>
+                <div style={{alignSelf:"flex-end"}}>
+                  <button onClick={resetInventory} style={btnGhost(false,{padding:"10px 16px",fontSize:13,borderColor:T.red,color:T.red})}>
+                    Reset to Invoice Qty
+                  </button>
+                </div>
+              </div>
+              <div style={{maxHeight:400,overflowY:"auto",display:"flex",flexDirection:"column",gap:4}}>
+                {ALL_ITEMS.map(item=>{
+                  const stock = getStock(item.id);
+                  const low = isLowStock(item.id);
+                  const out = stock <= 0;
+                  const unitLabel = item.unit==="per inch"?'"':item.unit==="per gram"?"g":"";
+                  return (
+                    <div key={item.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",background:out?T.redBg:low?"#FFF8E1":"transparent",borderRadius:6,border:`1px solid ${out?T.red+"20":low?"#B8860B20":T.border}`}}>
+                      <div style={{flex:1,fontSize:13,color:T.text}}>{item.name} <span style={{color:T.dim,fontSize:11}}>({item.metal})</span></div>
+                      <div style={{display:"flex",alignItems:"center",gap:4}}>
+                        <button onClick={()=>adjustStock(item.id,-1)} style={{width:26,height:26,borderRadius:6,border:`1px solid ${T.border}`,background:"none",cursor:"pointer",fontSize:16,fontWeight:700,color:T.dim,display:"flex",alignItems:"center",justifyContent:"center"}}>&minus;</button>
+                        <input type="number" min="0" step={item.unit==="each"?1:0.1}
+                          value={item.unit==="each"?stock:parseFloat(stock.toFixed(1))}
+                          onChange={e=>setStock(item.id,parseFloat(e.target.value)||0)}
+                          style={{...inputSt({width:70,padding:"4px 6px",fontSize:14,textAlign:"center"})}}/>
+                        <button onClick={()=>adjustStock(item.id,1)} style={{width:26,height:26,borderRadius:6,border:`1px solid ${T.border}`,background:"none",cursor:"pointer",fontSize:16,fontWeight:700,color:T.dim,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
+                        <span style={{fontSize:11,color:T.dim,width:12}}>{unitLabel}</span>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
