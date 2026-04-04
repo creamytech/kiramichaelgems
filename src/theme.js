@@ -1,27 +1,45 @@
 // ─── THEME — KM Brand: Purple + Black + Gray on Light ───────────────────────
-export const T = {
+const LIGHT = {
   bg:"#F8F7FA", card:"#FFFFFF", border:"#E4E0EA", borderAcc:"#9B45D4",
-  // Purple brand palette
   accent:"#8B2FC9", accentLight:"#F3EAFA", accentMid:"#C58FE6", accentDark:"#6B1FA0",
-  // Legacy aliases (so existing code doesn't break)
   gold:"#8B2FC9", goldLight:"#F3EAFA", goldMid:"#C58FE6", goldDark:"#6B1FA0",
-  // Text
   text:"#1A1A1A", sub:"#555555", dim:"#888888",
-  // Status
   green:"#2D7D4F", greenBg:"#EAF6EF",
   red:"#C0392B", redBg:"#FDECEA",
-  // Shadows — purple-tinted
   shadow:"0 1px 2px rgba(80,30,120,0.03), 0 2px 8px rgba(80,30,120,0.05), 0 8px 24px rgba(80,30,120,0.05)",
   shadowLg:"0 1px 4px rgba(80,30,120,0.04), 0 4px 16px rgba(80,30,120,0.07), 0 16px 48px rgba(80,30,120,0.09)",
   shadowXl:"0 2px 8px rgba(80,30,120,0.04), 0 8px 24px rgba(80,30,120,0.07), 0 24px 64px rgba(80,30,120,0.12)",
   shadowInner:"inset 0 1px 2px rgba(80,30,120,0.04), inset 0 0 0 1px rgba(80,30,120,0.02)",
   shadowGold:"0 2px 8px rgba(139,47,201,0.15), 0 8px 24px rgba(139,47,201,0.18)",
-  // Gradients
   cardGradient:"linear-gradient(180deg, #FFFFFF 0%, #FDFCFE 50%, #FAF8FC 100%)",
   goldGradient:"linear-gradient(135deg, #A040E0 0%, #8B2FC9 40%, #7025A8 100%)",
   goldGradientLight:"linear-gradient(135deg, #F8F0FE 0%, #F3EAFA 50%, #EDE2F6 100%)",
   headerGradient:"linear-gradient(180deg, #FFFFFF 0%, #FDFCFE 100%)",
   shimmer:"linear-gradient(110deg, transparent 25%, rgba(255,255,255,0.5) 37%, transparent 63%)",
+};
+
+const DARK = {
+  ...LIGHT,
+  bg:"#1A1A1A", card:"#252525", border:"#333333", borderAcc:"#9B45D4",
+  text:"#EEEAE6", sub:"#AAAAAA", dim:"#777777",
+  greenBg:"#1A2E22", redBg:"#2E1A1A",
+  accentLight:"#2D1F3D",
+  goldGradientLight:"linear-gradient(135deg, #2D1F3D 0%, #35254A 50%, #2D1F3D 100%)",
+  cardGradient:"linear-gradient(180deg, #252525 0%, #222222 50%, #202020 100%)",
+  headerGradient:"linear-gradient(180deg, #1E1E1E 0%, #1A1A1A 100%)",
+  shadow:"0 1px 2px rgba(0,0,0,0.2), 0 2px 8px rgba(0,0,0,0.15)",
+  shadowLg:"0 1px 4px rgba(0,0,0,0.25), 0 4px 16px rgba(0,0,0,0.2)",
+  shadowXl:"0 2px 8px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.25)",
+  shadowInner:"inset 0 1px 2px rgba(0,0,0,0.2), inset 0 0 0 1px rgba(0,0,0,0.1)",
+  shadowGold:"0 2px 8px rgba(139,47,201,0.25), 0 8px 24px rgba(139,47,201,0.2)",
+  shimmer:"linear-gradient(110deg, transparent 25%, rgba(255,255,255,0.08) 37%, transparent 63%)",
+};
+
+export const T = {...LIGHT};
+
+export function applyDarkMode(dark) {
+  const src = dark ? DARK : LIGHT;
+  Object.assign(T, src);
 };
 
 export const fmt = (n,d=2) => Number(n).toLocaleString("en-US",{minimumFractionDigits:d,maximumFractionDigits:d});

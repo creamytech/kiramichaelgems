@@ -205,3 +205,39 @@ table tbody tr {
 table tbody tr:hover {
   background: #F8F7FA !important;
 }
+
+/* ─── Dark mode ──────────────────────────────────────────── */
+.km-dark {
+  --km-bg: #1A1A1A;
+  --km-card: #252525;
+  --km-text: #EEEAE6;
+  --km-sub: #AAAAAA;
+  --km-dim: #777777;
+  --km-border: #333333;
+}
+.km-dark table tbody tr:hover {
+  background: #2A2A2A !important;
+}
+.km-dark ::selection {
+  background: #6B1FA0;
+  color: #EEEAE6;
+}
+.km-dark input:focus, .km-dark select:focus, .km-dark textarea:focus {
+  box-shadow: 0 0 0 3px rgba(139,47,201,0.2), inset 0 1px 3px rgba(0,0,0,0.2) !important;
+}
+.km-dark ::-webkit-scrollbar-thumb {
+  background: #444;
+}
+.km-dark ::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* ─── Offline banner ─────────────────────────────────────── */
+@keyframes km-offlineIn {
+  from { opacity: 0; max-height: 0; padding: 0 16px; }
+  to   { opacity: 1; max-height: 40px; padding: 8px 16px; }
+}
+@keyframes km-offlineOut {
+  from { opacity: 1; max-height: 40px; padding: 8px 16px; }
+  to   { opacity: 0; max-height: 0; padding: 0 16px; }
+}

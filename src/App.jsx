@@ -1,14 +1,16 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import * as XLSX from "xlsx";
 import { DEFAULT_ITEMS, CATS, INITIAL_STOCK, INVOICE_TOTAL, INVOICE_COST, INVOICE_FREIGHT, INVOICE_GOLD_OZ, INVOICE_SILVER_OZ, INVOICE_14KGF_COST, INVOICE_925AG_COST } from "./data/catalog";
 import useMetalPrices from "./hooks/useMetalPrices";
 import useGeoTax from "./hooks/useGeoTax";
-import { T, fmt, todayStr, uid, store, cardSt, inputSt, labelSt, btnPrimary, btnGhost, tagSt } from "./theme";
+import useOnlineStatus from "./hooks/useOnlineStatus";
+import { T, fmt, todayStr, uid, store, cardSt, inputSt, labelSt, btnPrimary, btnGhost, tagSt, applyDarkMode } from "./theme";
 import Icon from "./components/Icons";
 import useResponsive from "./hooks/useResponsive";
 import QRBox from "./components/QRBox";
 import ItemModal from "./components/ItemModal";
 import { dbLoad, dbSave, isOnline, testConnection, getDebugInfo } from "./lib/supabase";
+import { haptic } from "./utils/haptic";
 
 const UNITS = ["each","per inch","per gram","per foot"];
 
@@ -16,6 +18,12 @@ export default function App() {
   const R = useResponsive();
   const metals = useMetalPrices();
   const geoTax = useGeoTax();
+  const netStatus = useOnlineStatus();
+  const [darkMode, setDarkMode] = useState(() => store.get("km-darkmode") || false);
+  const [pwaPrompt, setPwaPrompt] = useState(null);
+  const [showPwaPrompt, setShowPwaPrompt] = useState(false);
+  const [customerExpanded, setCustomerExpanded] = useState(null); // for customer list detail
+  const [showCloseShowModal, setShowCloseShowModal] = useState(false);
 
   const [records,    setRecords]    = useState([]);
   const [templates,  setTemplates]  = useState([]);
@@ -59,6 +67,9 @@ export default function App() {
   const [discountType,  setDiscountType]  = useState("%");
   const [toast,         setToast]         = useState(null);
   const [quickSell,     setQuickSell]     = useState(null); // item for quick sell modal
+  const [qsName,        setQsName]        = useState("");
+  const [qsPhone,       setQsPhone]       = useState("");
+  const [qsEmail,       setQsEmail]       = useState("");
 
   useEffect(() => {
     const splashMin = new Promise(r => setTimeout(r, 1800)); // Show splash at least 1.8s
@@ -124,6 +135,66 @@ export default function App() {
     // Wait for BOTH the minimum splash time AND data loading
     Promise.all([splashMin, loadData()]).then(() => setLoading(false));
   }, []);
+
+  // ── Dark mode effect ─────────────────────────────────────────────────────
+  useEffect(() => {
+    applyDarkMode(darkMode);
+    if (darkMode) document.documentElement.classList.add("km-dark");
+    else document.documentElement.classList.remove("km-dark");
+  }, [darkMode]);
+
+  function toggleDarkMode() {
+    const next = !darkMode;
+    setDarkMode(next);
+    store.set("km-darkmode", next);
+    applyDarkMode(next);
+    // Force re-render by toggling class
+    if (next) document.documentElement.classList.add("km-dark");
+    else document.documentElement.classList.remove("km-dark");
+  }
+
+  // ── PWA install prompt ─────────────────────────────────────────────────
+  useEffect(() => {
+    const handler = (e) => {
+      e.preventDefault();
+      setPwaPrompt(e);
+      const dismissed = store.get("km-pwa-dismissed");
+      if (!dismissed) setShowPwaPrompt(true);
+    };
+    window.addEventListener("beforeinstallprompt", handler);
+    return () => window.removeEventListener("beforeinstallprompt", handler);
+  }, []);
+
+  function installPwa() {
+    if (!pwaPrompt) return;
+    pwaPrompt.prompt();
+    pwaPrompt.userChoice.then(() => {
+      setShowPwaPrompt(false);
+      store.set("km-pwa-dismissed", true);
+    });
+  }
+
+  // ── Keyboard shortcuts ─────────────────────────────────────────────────
+  useEffect(() => {
+    function handleKey(e) {
+      const tag = document.activeElement?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      if (e.key === "Escape") {
+        if (showPicker) { setShowPicker(false); return; }
+        if (quickSell) { setQuickSell(null); return; }
+        if (itemModal) { setItemModal(null); return; }
+        if (qrFull) { setQrFull(false); return; }
+      }
+      if (e.key === "n" || e.key === "N") { setTab("build"); haptic(); return; }
+      if (e.key === "s" || e.key === "S") { saveBuild(); haptic(); return; }
+      const tabKeys = ["1","2","3","4","5"];
+      const tabIds = ["catalog","build","checkout","dashboard","records"];
+      const idx = tabKeys.indexOf(e.key);
+      if (idx >= 0) { setTab(tabIds[idx]); haptic(); }
+    }
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [showPicker, quickSell, itemModal, qrFull, buildItems, customerName]);
 
   const saveSettings = s => { setSettings(s); store.set("km-settings",s); dbSave("settings",s); showToast("Settings saved"); };
 
@@ -203,6 +274,7 @@ export default function App() {
   function quickSellComplete(name, phone, email) {
     const item = quickSell;
     if (!item || !name.trim()) return;
+    haptic();
     const qty = item.unit==="per inch"?18:1;
     const lineCost = item.price * qty;
     const mk = markup;
@@ -238,6 +310,7 @@ export default function App() {
 
   function saveBuild() {
     if (!buildItems.length || !customerName.trim()) return;
+    haptic();
     const rec = {
       id:Date.now(), date:orderDate, showId:activeShow||null, showName:activeShowData?.name||null, sellerId:activeSeller||null, sellerName:activeSellerData?.name||null,
       buildName:buildName.trim()||"Custom Build",
@@ -291,9 +364,9 @@ export default function App() {
   }
 
   function markPaid(id) {
+    haptic();
     const u = records.map(r=>r.id===id?{...r,paid:true}:r);
     setRecords(u); store.set("km-builds",u); dbSave("orders",u);
-    // Update checkoutRec if it's the one being marked
     if (checkoutRec?.id===id) setCheckoutRec({...checkoutRec, paid:true});
     showToast("Marked as paid");
   }
@@ -501,6 +574,152 @@ export default function App() {
     if (!window.confirm("Delete this profile?")) return;
     saveSellers(sellers.filter(s=>s.id!==id));
     if (activeSeller===id) { setActiveSeller(null); store.set("km-activeSeller",null); setSellerPicker(true); }
+  }
+
+  // ── Customer list ──────────────────────────────────────────────────────
+  const customerList = useMemo(() => {
+    const map = {};
+    records.forEach(r => {
+      const key = (r.customer||"").toLowerCase().trim();
+      if (!key) return;
+      if (!map[key]) map[key] = { name:r.customer, phone:r.phone||"", email:r.email||"", orders:0, total:0, lastDate:r.date, orderIds:[] };
+      map[key].orders++;
+      map[key].total += (r.totalWithTax || r.totalRetail);
+      if (!map[key].phone && r.phone) map[key].phone = r.phone;
+      if (!map[key].email && r.email) map[key].email = r.email;
+      map[key].lastDate = r.date;
+      map[key].orderIds.push(r.id);
+    });
+    return Object.values(map).sort((a,b) => b.total - a.total);
+  }, [records]);
+
+  // ── Repeat customer lookup helper ─────────────────────────────────────
+  function getCustomerSuggestions(query) {
+    if (!query || query.length < 2) return [];
+    const q = query.toLowerCase();
+    return customerList.filter(c => c.name.toLowerCase().includes(q)).slice(0, 5);
+  }
+
+  // ── End-of-day report ─────────────────────────────────────────────────
+  function generateDayReport() {
+    const today = todayStr();
+    let recs = records.filter(r => r.date === today);
+    if (activeShow) recs = recs.filter(r => r.showId === activeShow);
+    if (recs.length === 0) { showToast("No sales today", "info"); return null; }
+    const revenue = recs.reduce((s,r) => s + r.totalRetail, 0);
+    const profit = recs.reduce((s,r) => s + r.profit, 0);
+    const pieces = recs.reduce((s,r) => s + (r.pieces||1), 0);
+    const paid = recs.filter(r => r.paid);
+    const pending = recs.filter(r => !r.paid);
+    // Top 3 items
+    const itemMap = {};
+    recs.forEach(r => r.lines.forEach(l => {
+      if (!itemMap[l.name]) itemMap[l.name] = { name:l.name, revenue:0, qty:0 };
+      itemMap[l.name].revenue += l.lineCost * (r.markup||2.5);
+      itemMap[l.name].qty += l.qty * (r.pieces||1);
+    }));
+    const top3 = Object.values(itemMap).sort((a,b) => b.revenue - a.revenue).slice(0,3);
+    const cashCount = paid.length; // approximate: paid = collected
+    const showLabel = activeShowData ? ` @ ${activeShowData.name}` : "";
+    const text = `${settings.bizName} - Day Report${showLabel}\n${today}\n\n` +
+      `Revenue: $${fmt(revenue)}\nProfit: $${fmt(profit)}\nPieces Sold: ${pieces}\nOrders: ${recs.length}\n` +
+      `Paid: ${paid.length} ($${fmt(paid.reduce((s,r)=>s+(r.totalWithTax||r.totalRetail),0))})\n` +
+      `Pending: ${pending.length} ($${fmt(pending.reduce((s,r)=>s+(r.totalWithTax||r.totalRetail),0))})\n\n` +
+      `Top Items:\n${top3.map((t,i) => `  ${i+1}. ${t.name} — $${fmt(t.revenue)} (${t.qty} sold)`).join("\n")}\n`;
+    return text;
+  }
+
+  function sendDayReport() {
+    const text = generateDayReport();
+    if (!text) return;
+    if (navigator.share) {
+      navigator.share({ title:`${settings.bizName} Day Report`, text }).catch(()=>{});
+    } else {
+      const body = encodeURIComponent(text);
+      window.location.href = `sms:?&body=${body}`;
+    }
+  }
+
+  // ── Reorder alert (items running out in ~3 shows) ─────────────────────
+  const reorderAlerts = useMemo(() => {
+    if (records.length === 0) return [];
+    // Calculate avg daily usage rate per item across all shows
+    const showDates = {};
+    records.forEach(r => { if (r.showId) showDates[r.showId] = (showDates[r.showId]||0)+1; });
+    const numShows = Object.keys(showDates).length || 1;
+    const usagePerShow = {};
+    records.forEach(r => {
+      r.lines.forEach(l => {
+        const match = ALL_ITEMS.find(i => i.name === l.name && i.metal === l.metal);
+        if (!match) return;
+        if (!usagePerShow[match.id]) usagePerShow[match.id] = { item:match, totalUsed:0 };
+        usagePerShow[match.id].totalUsed += l.qty * (r.pieces||1);
+      });
+    });
+    const alerts = [];
+    Object.values(usagePerShow).forEach(({ item, totalUsed }) => {
+      const avgPerShow = totalUsed / numShows;
+      const stock = inventory[item.id] || 0;
+      const showsLeft = avgPerShow > 0 ? stock / avgPerShow : Infinity;
+      if (showsLeft <= 3 && stock > 0) {
+        alerts.push({ item, stock, avgPerShow, showsLeft, reorderQty: Math.ceil(avgPerShow * 3 - stock) });
+      } else if (stock <= 0 && avgPerShow > 0) {
+        alerts.push({ item, stock:0, avgPerShow, showsLeft:0, reorderQty: Math.ceil(avgPerShow * 3) });
+      }
+    });
+    return alerts.sort((a,b) => a.showsLeft - b.showsLeft);
+  }, [records, inventory, ALL_ITEMS]);
+
+  function generateReorderText() {
+    if (reorderAlerts.length === 0) { showToast("No items need reordering", "info"); return; }
+    const text = `${settings.bizName} - Reorder List\n${todayStr()}\n\nItems running low (< 3 shows of stock):\n\n` +
+      reorderAlerts.map(a =>
+        `${a.item.name} (${a.item.metal})\n  Stock: ${a.item.unit==="each"?a.stock:fmt(a.stock,1)}${a.item.unit==="per inch"?'"':a.item.unit==="per gram"?"g":""} | Avg/show: ${fmt(a.avgPerShow,1)} | Shows left: ${fmt(a.showsLeft,1)} | Reorder: ${a.reorderQty}`
+      ).join("\n\n") + `\n\nTotal items to reorder: ${reorderAlerts.length}`;
+    if (navigator.share) {
+      navigator.share({ title:"Reorder List", text }).catch(()=>{});
+    } else {
+      navigator.clipboard.writeText(text).then(()=>showToast("Reorder list copied!")).catch(()=>{});
+    }
+  }
+
+  // ── Close Show — generate P&L and save on show ────────────────────────
+  function closeShow(showId) {
+    const show = shows.find(s => s.id === showId);
+    if (!show) return;
+    const sOrders = records.filter(r => r.showId === showId);
+    const revenue = sOrders.reduce((s,r) => s + r.totalRetail, 0);
+    const profit = sOrders.reduce((s,r) => s + r.profit, 0);
+    const cogs = sOrders.reduce((s,r) => s + (r.materialCost||0)*(r.pieces||1), 0);
+    const laborTotal = sOrders.reduce((s,r) => s + (r.totalLabor||0), 0);
+    const pieces = sOrders.reduce((s,r) => s + (r.pieces||1), 0);
+    const tax = sOrders.reduce((s,r) => s + (r.taxAmt||0), 0);
+    const discount = sOrders.reduce((s,r) => s + (r.discountAmt||0), 0);
+    const paid = sOrders.filter(r => r.paid);
+    const collected = paid.reduce((s,r) => s + (r.totalWithTax||r.totalRetail), 0);
+
+    const summary = {
+      closedAt: new Date().toISOString(),
+      orders: sOrders.length, pieces, revenue, profit, cogs, laborTotal, tax, discount,
+      collected, pending: revenue - collected + tax,
+      paidCount: paid.length, pendingCount: sOrders.length - paid.length,
+    };
+
+    const updated = shows.map(s => s.id === showId ? { ...s, closed: true, summary } : s);
+    saveShows(updated);
+    if (activeShow === showId) { setActiveShow(null); store.set("km-activeShow", null); }
+    setShowCloseShowModal(false);
+    showToast(`"${show.name}" closed — P&L saved`);
+  }
+
+  // ── Share invoice ─────────────────────────────────────────────────────
+  function shareInvoice(rec) {
+    const text = receiptText(rec);
+    if (navigator.share) {
+      navigator.share({ title:`${rec.paid?"Receipt":"Invoice"}: ${rec.buildName}`, text }).catch(()=>{});
+    } else {
+      navigator.clipboard.writeText(text).then(() => showToast("Invoice copied to clipboard")).catch(()=>{});
+    }
   }
 
   const displayRec = checkoutRec || records[0];
@@ -955,7 +1174,24 @@ export default function App() {
   );
 
   return (
-    <div style={{minHeight:"100vh",background:T.bg,fontFamily:"Georgia,'Times New Roman',serif",color:T.text,fontSize:15}}>
+    <div className={darkMode?"km-dark":""} style={{minHeight:"100vh",background:T.bg,fontFamily:"Georgia,'Times New Roman',serif",color:T.text,fontSize:15,transition:"background 0.3s, color 0.3s"}}>
+
+      {/* PWA Install Prompt */}
+      {showPwaPrompt && (
+        <div style={{position:"fixed",bottom:R.isMobile?70:20,left:"50%",transform:"translateX(-50%)",zIndex:250,
+          background:T.card,border:`1.5px solid ${T.borderAcc}`,borderRadius:14,padding:"14px 20px",
+          boxShadow:T.shadowLg,display:"flex",alignItems:"center",gap:12,maxWidth:360,animation:"km-modalSlide 0.3s cubic-bezier(0.22,1,0.36,1)"}}>
+          <Icon name="Download" size={22} color={T.accent}/>
+          <div style={{flex:1}}>
+            <div style={{fontSize:14,fontWeight:700,color:T.text}}>Add to Home Screen</div>
+            <div style={{fontSize:12,color:T.dim}}>Quick access to KM Gems</div>
+          </div>
+          <button onClick={installPwa} className="km-btn-press" style={{...btnPrimary({padding:"8px 14px",fontSize:13})}}>Install</button>
+          <button onClick={()=>{setShowPwaPrompt(false);store.set("km-pwa-dismissed",true);}} style={{background:"none",border:"none",cursor:"pointer",color:T.dim,padding:4}}>
+            <Icon name="X" size={16}/>
+          </button>
+        </div>
+      )}
 
       {/* HEADER */}
       <header style={{
@@ -994,7 +1230,7 @@ export default function App() {
         {!R.isMobile && (
           <nav style={{display:"flex",gap:4,background:T.bg,borderRadius:12,padding:4,border:`1px solid ${T.border}`}}>
             {NAV.map(n=>(
-              <button key={n.id} onClick={()=>setTab(n.id)} className="km-btn-press" style={{
+              <button key={n.id} onClick={()=>{setTab(n.id);haptic();}} className="km-btn-press" style={{
                 background:tab===n.id?T.card:"transparent",
                 color:tab===n.id?T.gold:T.dim,
                 border:"none",
@@ -1014,6 +1250,18 @@ export default function App() {
           </nav>
         )}
       </header>
+
+      {/* Offline indicator */}
+      {!netStatus.online && (
+        <div style={{background:T.red,color:"#fff",textAlign:"center",padding:"8px 16px",fontSize:13,fontWeight:600,animation:"km-offlineIn 0.3s ease"}}>
+          Offline — changes saved locally
+        </div>
+      )}
+      {netStatus.online && netStatus.showBack && (
+        <div style={{background:T.green,color:"#fff",textAlign:"center",padding:"8px 16px",fontSize:13,fontWeight:600,animation:"km-offlineIn 0.3s ease"}}>
+          Back online
+        </div>
+      )}
 
       <main style={{maxWidth:1200,margin:"0 auto",padding:mainPad,paddingBottom:mainPB,animation:"km-tabEnter 0.35s ease-out"}}>
 
@@ -1373,7 +1621,24 @@ export default function App() {
                 </div>
                 <div style={{display:"grid",gridTemplateColumns:R.isMobile?"1fr":"1fr 1fr 1fr",gap:10}}>
                   <div><label style={labelSt}>Build Name</label><input value={buildName} onChange={e=>setBuildName(e.target.value)} placeholder="e.g. Shell Necklace" style={inputSt()}/></div>
-                  <div><label style={labelSt}>Customer Name *</label><input value={customerName} onChange={e=>setCustomerName(e.target.value)} placeholder="Full name" style={inputSt()}/></div>
+                  <div style={{position:"relative"}}>
+                    <label style={labelSt}>Customer Name *</label>
+                    <input value={customerName} onChange={e=>setCustomerName(e.target.value)} placeholder="Full name" style={inputSt()} autoComplete="off"/>
+                    {customerName.length>=2 && getCustomerSuggestions(customerName).length>0 && (
+                      <div style={{position:"absolute",top:"100%",left:0,right:0,zIndex:50,background:T.card,border:`1px solid ${T.border}`,borderRadius:10,boxShadow:T.shadowLg,marginTop:4,overflow:"hidden"}}>
+                        {getCustomerSuggestions(customerName).map((c,i)=>(
+                          <div key={i} onClick={()=>{setCustomerName(c.name);setCustomerPhone(c.phone);setCustomerEmail(c.email);}} style={{
+                            padding:"10px 14px",cursor:"pointer",borderBottom:i<4?`1px solid ${T.border}`:"none",
+                            transition:"background 0.1s",
+                          }} onMouseEnter={e=>e.currentTarget.style.background=T.accentLight}
+                             onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                            <div style={{fontSize:14,fontWeight:600,color:T.text}}>{c.name}</div>
+                            <div style={{fontSize:11,color:T.dim}}>{c.orders} order{c.orders!==1?"s":""} · ${fmt(c.total)} spent{c.phone?` · ${c.phone}`:""}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                   <div><label style={labelSt}>Phone</label><input type="tel" value={customerPhone} onChange={e=>setCustomerPhone(e.target.value)} placeholder="(239) 555-0123" style={inputSt()}/></div>
                 </div>
                 <div style={{display:"grid",gridTemplateColumns:R.isMobile?"1fr":"1fr 1fr",gap:10,marginTop:10}}>
@@ -1473,6 +1738,12 @@ export default function App() {
                     {displayRec.notes}
                   </div>
                 )}
+                {/* Share Invoice button */}
+                <div style={{padding:"12px 24px",borderTop:`1px solid ${T.border}`,display:"flex",justifyContent:"center"}}>
+                  <button onClick={()=>shareInvoice(displayRec)} className="km-btn-press" style={{...btnGhost(false,{padding:"9px 18px",fontSize:13,display:"flex",alignItems:"center",gap:6})}}>
+                    <Icon name="Share" size={14}/>Share Invoice
+                  </button>
+                </div>
               </div>
 
               {/* ── Payment / Receipt Panel ── */}
@@ -1650,11 +1921,18 @@ export default function App() {
               <h2 style={{margin:"0 0 2px",fontSize:R.isMobile?20:24,fontWeight:700}}>Dashboard</h2>
               <p style={{margin:0,color:T.sub,fontSize:14}}>Real-time P&L &middot; Investment: ${fmt(INVOICE_TOTAL)}</p>
             </div>
-            {R.isMobile && (
-              <button onClick={()=>setTab("settings")} className="km-btn-press" style={{...btnGhost(false,{padding:"8px 12px",display:"flex",alignItems:"center",gap:6,fontSize:13})}}>
-                <Icon name="Gear" size={16}/>Settings
-              </button>
-            )}
+            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+              {records.length>0 && (
+                <button onClick={sendDayReport} className="km-btn-press" style={{...btnPrimary({padding:"8px 14px",fontSize:13,display:"flex",alignItems:"center",gap:6})}}>
+                  <Icon name="Share" size={14}/>Day Report
+                </button>
+              )}
+              {R.isMobile && (
+                <button onClick={()=>setTab("settings")} className="km-btn-press" style={{...btnGhost(false,{padding:"8px 12px",display:"flex",alignItems:"center",gap:6,fontSize:13})}}>
+                  <Icon name="Gear" size={16}/>Settings
+                </button>
+              )}
+            </div>
           </div>
 
           {/* ROI Hero Card */}
@@ -2000,6 +2278,89 @@ export default function App() {
             </div>
           )}
 
+          {/* Reorder Alerts */}
+          {reorderAlerts.length>0 && (
+            <div style={cardSt({padding:"20px",marginBottom:16})}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,flexWrap:"wrap",gap:8}}>
+                <div style={{fontWeight:700,fontSize:16,display:"flex",alignItems:"center",gap:8}}>
+                  <Icon name="Alert" size={18} color={T.red}/> Reorder Alerts
+                  <span style={tagSt(T.red,T.redBg)}>{reorderAlerts.length}</span>
+                </div>
+                <button onClick={generateReorderText} className="km-btn-press" style={{...btnPrimary({padding:"8px 14px",fontSize:13,display:"flex",alignItems:"center",gap:6})}}>
+                  <Icon name="Share" size={14}/>Generate Reorder List
+                </button>
+              </div>
+              <p style={{fontSize:13,color:T.sub,marginBottom:12}}>Items that will run out within 3 shows based on average usage.</p>
+              <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                {reorderAlerts.slice(0,8).map(a=>(
+                  <div key={a.item.id} style={{padding:"10px 14px",borderRadius:10,
+                    background:a.showsLeft<=1?T.redBg:T.accentLight,
+                    border:`1px solid ${a.showsLeft<=1?T.red+"25":T.accent+"25"}`,
+                    display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8,
+                  }}>
+                    <div>
+                      <div style={{fontSize:14,fontWeight:600,color:T.text}}>{a.item.name}</div>
+                      <div style={{fontSize:12,color:T.dim}}>{a.item.metal} | Stock: {a.item.unit==="each"?a.stock:fmt(a.stock,1)} | Avg/show: {fmt(a.avgPerShow,1)}</div>
+                    </div>
+                    <div style={{textAlign:"right"}}>
+                      <div style={{fontSize:14,fontWeight:700,color:a.showsLeft<=1?T.red:T.accent}}>{fmt(a.showsLeft,1)} shows left</div>
+                      <div style={{fontSize:12,color:T.dim}}>Reorder: {a.reorderQty}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Customer List */}
+          {customerList.length>0 && (
+            <div style={cardSt({padding:"20px",marginBottom:16})}>
+              <div style={{fontWeight:700,fontSize:16,marginBottom:14,display:"flex",alignItems:"center",gap:8}}>
+                <Icon name="Users" size={18} color={T.accent}/> Customers
+                <span style={tagSt()}>{customerList.length}</span>
+              </div>
+              <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                {customerList.map((c,i)=>(
+                  <div key={i}>
+                    <div onClick={()=>setCustomerExpanded(customerExpanded===i?null:i)}
+                      style={{padding:"12px 14px",borderRadius:10,cursor:"pointer",
+                        background:customerExpanded===i?T.accentLight:T.bg,
+                        border:`1px solid ${customerExpanded===i?T.accent+"40":T.border}`,
+                        display:"flex",justifyContent:"space-between",alignItems:"center",transition:"all 0.2s",
+                      }}>
+                      <div>
+                        <div style={{fontSize:14,fontWeight:700,color:T.text}}>{c.name}</div>
+                        <div style={{fontSize:12,color:T.dim}}>
+                          {c.phone && `${c.phone} · `}{c.email && `${c.email} · `}{c.orders} order{c.orders!==1?"s":""} · Last: {c.lastDate}
+                        </div>
+                      </div>
+                      <div style={{fontSize:16,fontWeight:700,color:T.accent}}>${fmt(c.total)}</div>
+                    </div>
+                    {customerExpanded===i && (
+                      <div style={{padding:"8px 14px",background:T.bg,borderRadius:"0 0 10px 10px",border:`1px solid ${T.border}`,borderTop:"none"}}>
+                        {records.filter(r=>c.orderIds.includes(r.id)).map(r=>(
+                          <div key={r.id} onClick={()=>{setCheckoutRec(r);setTab("checkout");}} style={{
+                            padding:"8px 0",borderBottom:`1px solid ${T.border}`,cursor:"pointer",
+                            display:"flex",justifyContent:"space-between",alignItems:"center",
+                          }}>
+                            <div>
+                              <div style={{fontSize:13,fontWeight:600,color:T.text}}>{r.buildName}</div>
+                              <div style={{fontSize:11,color:T.dim}}>{r.date} · {r.pieces} pc</div>
+                            </div>
+                            <div style={{display:"flex",alignItems:"center",gap:8}}>
+                              <span style={{fontSize:14,fontWeight:700,color:T.accent}}>${fmt(r.totalRetail)}</span>
+                              <span style={tagSt(r.paid?T.green:T.dim,r.paid?T.greenBg:"#EDEBF0")}>{r.paid?"Paid":"Pending"}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* View all orders link */}
           {records.length>0 && (
             <button onClick={()=>setTab("records")} className="km-btn-press" style={{
@@ -2257,6 +2618,27 @@ export default function App() {
               </div>
             </div>
 
+            {/* Dark Mode */}
+            <div style={cardSt({padding:"20px"})}>
+              <div style={{fontWeight:700,fontSize:16,marginBottom:12}}>Appearance</div>
+              <div style={{display:"flex",alignItems:"center",gap:12}}>
+                <button onClick={toggleDarkMode} style={{
+                  width:48,height:26,borderRadius:13,border:"none",cursor:"pointer",
+                  background:darkMode?T.accent:"#D0C4DC",
+                  position:"relative",transition:"background 0.2s",
+                }}>
+                  <div style={{width:22,height:22,borderRadius:11,background:"#fff",position:"absolute",top:2,
+                    left:darkMode?24:2,transition:"left 0.2s",boxShadow:"0 1px 3px rgba(0,0,0,0.2)"}}/>
+                </button>
+                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  <Icon name={darkMode?"Moon":"Sun"} size={18} color={T.accent}/>
+                  <span style={{fontSize:15,color:T.text,fontWeight:600}}>
+                    {darkMode ? "Dark mode" : "Light mode"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
             {/* Inventory Management */}
             <div style={cardSt({padding:"20px"})}>
               <div style={{fontWeight:700,fontSize:16,marginBottom:6}}>Inventory</div>
@@ -2355,13 +2737,13 @@ export default function App() {
       {R.isMobile && (
         <nav style={{
           position:"fixed",bottom:0,left:0,right:0,zIndex:100,
-          background:"rgba(255,255,255,0.95)",borderTop:`1px solid ${T.border}`,
+          background:darkMode?"rgba(26,26,26,0.95)":"rgba(255,255,255,0.95)",borderTop:`1px solid ${T.border}`,
           display:"flex", paddingBottom:"env(safe-area-inset-bottom,0px)",
           boxShadow:"0 -1px 3px rgba(100,80,40,0.04), 0 -4px 16px rgba(100,80,40,0.06)",
           backdropFilter:"blur(12px)", WebkitBackdropFilter:"blur(12px)",
         }}>
           {NAV.map(n=>(
-            <button key={n.id} onClick={()=>setTab(n.id)} style={{
+            <button key={n.id} onClick={()=>{setTab(n.id);haptic();}} style={{
               flex:1, display:"flex", flexDirection:"column", alignItems:"center",
               justifyContent:"center", gap:2, padding:"10px 0 8px",
               background:"none", border:"none", cursor:"pointer",
@@ -2446,8 +2828,14 @@ export default function App() {
                         {s.location && `${s.location} · `}{s.date} · {showOrders.length} order{showOrders.length!==1?"s":""}
                       </div>
                     </div>
-                    <div style={{display:"flex",alignItems:"center",gap:10}}>
+                    <div style={{display:"flex",alignItems:"center",gap:6}}>
                       <div style={{fontSize:16,fontWeight:700,color:rev>0?T.green:T.dim}}>${fmt(rev)}</div>
+                      {!s.closed && showOrders.length>0 && (
+                        <button onClick={e=>{e.stopPropagation();closeShow(s.id);}} style={{background:T.accent,border:"none",borderRadius:6,cursor:"pointer",color:"#fff",padding:"4px 8px",fontSize:11,fontWeight:700}}>
+                          Close
+                        </button>
+                      )}
+                      {s.closed && <span style={{...tagSt(T.green,T.greenBg),fontSize:10}}>Closed</span>}
                       <button onClick={e=>{e.stopPropagation();deleteShow(s.id);}} style={{background:"none",border:"none",cursor:"pointer",color:T.dim,padding:4}}>
                         <Icon name="Trash" size={14}/>
                       </button>
@@ -2464,9 +2852,10 @@ export default function App() {
       {quickSell && (()=>{
         const item = quickSell;
         const retail = item.price * (item.unit==="per inch"?18:1) * markup;
+        const qsSuggestions = getCustomerSuggestions(qsName);
         return (
           <div style={{position:"fixed",inset:0,zIndex:200,background:"rgba(0,0,0,0.55)",backdropFilter:"blur(4px)",WebkitBackdropFilter:"blur(4px)",display:"flex",alignItems:"flex-end",justifyContent:"center",animation:"km-overlayIn 0.2s ease"}}
-            onClick={()=>setQuickSell(null)}>
+            onClick={()=>{setQuickSell(null);setQsName("");setQsPhone("");setQsEmail("");}}>
             <div style={{...cardSt(),width:"100%",maxWidth:480,borderBottomLeftRadius:0,borderBottomRightRadius:0,borderTopLeftRadius:20,borderTopRightRadius:20,padding:"28px 22px 36px",animation:"km-modalSlide 0.3s cubic-bezier(0.22,1,0.36,1)"}}
               onClick={e=>e.stopPropagation()}>
               <div style={{width:36,height:4,borderRadius:2,background:T.border,margin:"0 auto 20px"}}/>
@@ -2477,26 +2866,37 @@ export default function App() {
                 <div style={{fontSize:12,color:T.dim}}>at {markup}x markup</div>
               </div>
               <div style={{display:"flex",flexDirection:"column",gap:12}}>
-                <div>
+                <div style={{position:"relative"}}>
                   <label style={labelSt}>Customer Name *</label>
-                  <input id="qs-name" placeholder="Full name" style={inputSt({fontSize:18,padding:"14px 16px"})} autoFocus/>
+                  <input value={qsName} onChange={e=>setQsName(e.target.value)} placeholder="Full name" style={inputSt({fontSize:18,padding:"14px 16px"})} autoFocus autoComplete="off"/>
+                  {qsName.length>=2 && qsSuggestions.length>0 && (
+                    <div style={{position:"absolute",top:"100%",left:0,right:0,zIndex:50,background:T.card,border:`1px solid ${T.border}`,borderRadius:10,boxShadow:T.shadowLg,marginTop:4,overflow:"hidden"}}>
+                      {qsSuggestions.map((c,i)=>(
+                        <div key={i} onClick={()=>{setQsName(c.name);setQsPhone(c.phone);setQsEmail(c.email);}} style={{
+                          padding:"10px 14px",cursor:"pointer",borderBottom:i<4?`1px solid ${T.border}`:"none",
+                          transition:"background 0.1s",
+                        }} onMouseEnter={e=>e.currentTarget.style.background=T.accentLight}
+                           onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                          <div style={{fontSize:14,fontWeight:600,color:T.text}}>{c.name}</div>
+                          <div style={{fontSize:11,color:T.dim}}>{c.orders} order{c.orders!==1?"s":""}{c.phone?` · ${c.phone}`:""}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
                   <div>
                     <label style={labelSt}>Phone</label>
-                    <input id="qs-phone" type="tel" placeholder="(555) 123-4567" style={inputSt()}/>
+                    <input value={qsPhone} onChange={e=>setQsPhone(e.target.value)} type="tel" placeholder="(555) 123-4567" style={inputSt()}/>
                   </div>
                   <div>
                     <label style={labelSt}>Email</label>
-                    <input id="qs-email" type="email" placeholder="optional" style={inputSt()}/>
+                    <input value={qsEmail} onChange={e=>setQsEmail(e.target.value)} type="email" placeholder="optional" style={inputSt()}/>
                   </div>
                 </div>
               </div>
               <button className="km-btn-press" onClick={()=>{
-                const n=document.getElementById("qs-name")?.value;
-                const p=document.getElementById("qs-phone")?.value;
-                const e=document.getElementById("qs-email")?.value;
-                if(n?.trim()) quickSellComplete(n,p||"",e||"");
+                if(qsName.trim()) { quickSellComplete(qsName,qsPhone,qsEmail); setQsName(""); setQsPhone(""); setQsEmail(""); }
               }} style={{...btnPrimary({width:"100%",padding:"16px",fontSize:17,marginTop:20,display:"flex",alignItems:"center",justifyContent:"center",gap:8})}}>
                 <Icon name="Check" size={18}/>Sell &mdash; ${fmt(retail)}
               </button>
