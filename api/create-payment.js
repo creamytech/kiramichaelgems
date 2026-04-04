@@ -1,5 +1,5 @@
 // Vercel serverless function — creates a Stripe PaymentIntent
-// POST /api/create-payment { amount: 3972 } (amount in cents)
+// Supports card + Apple Pay + Google Pay
 
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -17,12 +17,12 @@ export default async function handler(req, res) {
 
     if (!amount || amount < 50) return res.status(400).json({ error: "Amount must be at least $0.50" });
 
-    // Create PaymentIntent via Stripe API directly (no SDK needed server-side)
+    // Create PaymentIntent — automatic_payment_methods enables Apple Pay, Google Pay, cards
     const params = new URLSearchParams({
       amount: String(Math.round(amount)),
       currency,
       description,
-      "payment_method_types[]": "card",
+      "automatic_payment_methods[enabled]": "true",
       "metadata[source]": "km-gems-app",
     });
     if (customer_name) params.append("metadata[customer]", customer_name);
