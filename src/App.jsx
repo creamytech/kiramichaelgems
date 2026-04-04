@@ -227,7 +227,12 @@ export default function App() {
     }
 
     // Wait for BOTH the minimum splash time AND data loading
-    Promise.all([splashMin, loadData()]).then(() => setLoading(false));
+    Promise.all([splashMin, loadData()]).then(() => {
+      setLoading(false);
+      // If no active seller after loading, force the picker
+      const ls = store.get("km-activeSeller");
+      if (!ls) setSellerPicker(true);
+    });
   }, []);
 
   // ── Dark mode effect ─────────────────────────────────────────────────────
@@ -1417,7 +1422,7 @@ export default function App() {
                 {activeSellerData.name}
               </button>
             ) : (
-              <button onClick={()=>setSellerPicker(true)} style={{background:T.bg,border:`1px solid ${T.border}`,borderRadius:20,padding:"6px 10px",cursor:"pointer",fontSize:11,color:T.dim,fontFamily:"Georgia,serif"}}>
+              <button onClick={()=>{setActiveSeller(null);store.set("km-activeSeller",null);setSellerPicker(true);}} style={{background:T.accent,border:"none",borderRadius:20,padding:"6px 12px",cursor:"pointer",fontSize:12,fontWeight:600,color:"#fff",fontFamily:"Georgia,serif"}}>
                 Sign in
               </button>
             )}
