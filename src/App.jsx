@@ -15,7 +15,7 @@ export default function App() {
   const [records,    setRecords]    = useState([]);
   const [templates,  setTemplates]  = useState([]);
   const [customItems,setCustomItems]= useState([]);
-  const [settings,   setSettings]   = useState({paypal:"",venmo:"",cashapp:"",bizName:"Kiramichael Gems"});
+  const [settings,   setSettings]   = useState({paypal:"",venmo:"",cashapp:"",bizName:"Kiramichael Gems",taxRate:0,taxEnabled:false,priceRounding:"none"});
 
   const [tab,         setTab]         = useState("catalog");
   const [flash,       setFlash]       = useState("");
@@ -83,12 +83,30 @@ export default function App() {
     const discAmt      = discountType==="%"
       ? retailBefore*(Math.min(discount,100)/100)
       : Math.min(discount, retailBefore);
-    const totalRetail  = Math.max(0, retailBefore-discAmt);
-    const rpp          = Math.max(0,(materialCost+labor)*markup - (discountType==="%"?(materialCost+labor)*markup*(Math.min(discount,100)/100):Math.min(discount/pieces,(materialCost+labor)*markup)));
+    let totalRetail  = Math.max(0, retailBefore-discAmt);
+    let rpp          = Math.max(0,(materialCost+labor)*markup - (discountType==="%"?(materialCost+labor)*markup*(Math.min(discount,100)/100):Math.min(discount/pieces,(materialCost+labor)*markup)));
+
+    // Price rounding
+    const roundPrice = (p) => {
+      if (settings.priceRounding==="whole") return Math.round(p);
+      if (settings.priceRounding==="99") return Math.floor(p) + 0.99;
+      if (settings.priceRounding==="95") return Math.floor(p) + 0.95;
+      return p;
+    };
+    if (settings.priceRounding!=="none") {
+      totalRetail = roundPrice(totalRetail);
+      rpp = pieces>0 ? totalRetail/pieces : rpp;
+    }
+
+    // Tax
+    const taxRate = settings.taxEnabled ? (settings.taxRate||0)/100 : 0;
+    const taxAmt = totalRetail * taxRate;
+    const totalWithTax = totalRetail + taxAmt;
+
     const profit       = totalRetail-subtotal;
     const margin       = totalRetail>0?(profit/totalRetail)*100:0;
-    return {lines, materialCost, totalMat, totalLabor, subtotal, retailBefore, discAmt, totalRetail, profit, margin, rpp};
-  }, [buildItems, labor, markup, pieces, discount, discountType, ALL_ITEMS]);
+    return {lines, materialCost, totalMat, totalLabor, subtotal, retailBefore, discAmt, totalRetail, profit, margin, rpp, taxAmt, totalWithTax};
+  }, [buildItems, labor, markup, pieces, discount, discountType, ALL_ITEMS, settings.taxEnabled, settings.taxRate, settings.priceRounding]);
 
   function addToBuild(itemId) {
     setBuildItems(prev => {
@@ -115,6 +133,7 @@ export default function App() {
       materialCost:totals.materialCost, totalMaterial:totals.totalMat,
       totalLabor:totals.totalLabor, retailBefore:totals.retailBefore,
       discountAmt:totals.discAmt, totalRetail:totals.totalRetail,
+      taxAmt:totals.taxAmt, totalWithTax:totals.totalWithTax,
       profit:totals.profit, margin:totals.margin, rpp:totals.rpp, paid:false,
     };
     const updated = [rec,...records];
@@ -187,11 +206,37 @@ export default function App() {
   const venmoLink  = (amt,note) => settings.venmo  ? `https://venmo.com/?txn=pay&audience=private&recipients=${settings.venmo}&amount=${amt.toFixed(2)}&note=${encodeURIComponent(note)}` : null;
   const cashLink   = amt        => settings.cashapp ? `https://cash.app/${settings.cashapp.startsWith("$")?settings.cashapp:"$"+settings.cashapp}/${amt.toFixed(2)}` : null;
 
+  const payAmt = displayRec ? (displayRec.totalWithTax || displayRec.totalRetail) : 0;
   const PAY_METHODS = [
-    settings.paypal  && {key:"paypal",  label:"PayPal",   icon:"PayPal",  bg:"#0070BA", link:displayRec?paypalLink(displayRec.totalRetail,`${displayRec.buildName} - ${settings.bizName}`):null},
-    settings.venmo   && {key:"venmo",   label:"Venmo",    icon:"Venmo",   bg:"#3D95CE", link:displayRec?venmoLink(displayRec.totalRetail,`${displayRec.buildName} - ${settings.bizName}`):null},
-    settings.cashapp && {key:"cashapp", label:"Cash App", icon:"CashApp", bg:"#00A63E", link:displayRec?cashLink(displayRec.totalRetail):null},
+    settings.paypal  && {key:"paypal",  label:"PayPal",   icon:"PayPal",  bg:"#0070BA", link:displayRec?paypalLink(payAmt,`${displayRec.buildName} - ${settings.bizName}`):null},
+    settings.venmo   && {key:"venmo",   label:"Venmo",    icon:"Venmo",   bg:"#3D95CE", link:displayRec?venmoLink(payAmt,`${displayRec.buildName} - ${settings.bizName}`):null},
+    settings.cashapp && {key:"cashapp", label:"Cash App", icon:"CashApp", bg:"#00A63E", link:displayRec?cashLink(payAmt):null},
   ].filter(Boolean);
+
+  // Email invoice generator
+  function emailInvoice(rec) {
+    const amt = rec.totalWithTax || rec.totalRetail;
+    const lines = rec.lines.map(l => `  ${l.name} (${l.metal}) x${l.qty} — $${fmt(l.lineCost)}`).join("\n");
+    const subject = encodeURIComponent(`Invoice: ${rec.buildName} — ${settings.bizName}`);
+    const body = encodeURIComponent(
+      `${settings.bizName}\nInvoice — ${rec.date}\n\nCustomer: ${rec.customer}\nBuild: ${rec.buildName}\n\nItems:\n${lines}\n\nSubtotal: $${fmt(rec.totalRetail)}${rec.taxAmt>0?`\nTax: $${fmt(rec.taxAmt)}`:""}${rec.discountAmt>0?`\nDiscount: -$${fmt(rec.discountAmt)}`:""}\n\nTotal Due: $${fmt(amt)}\n${rec.notes?`\nNote: ${rec.notes}\n`:""}\nThank you for your purchase!`
+    );
+    window.location.href = `mailto:${rec.email||""}?subject=${subject}&body=${body}`;
+  }
+
+  // Reorder calculator
+  const reorderData = useMemo(() => {
+    const usage = {};
+    records.forEach(r => {
+      r.lines.forEach(l => {
+        const key = l.name + "|" + l.metal;
+        if (!usage[key]) usage[key] = {name:l.name, metal:l.metal, unit:l.unit, price:l.price, totalQty:0, orderCount:0};
+        usage[key].totalQty += l.qty * (r.pieces||1);
+        usage[key].orderCount++;
+      });
+    });
+    return Object.values(usage).sort((a,b) => b.totalQty - a.totalQty);
+  }, [records]);
 
   function exportExcel() {
     const rows = [];
@@ -558,6 +603,8 @@ export default function App() {
                       ["Total labor",           `$${fmt(totals.totalLabor)}`,   false],
                       ...(totals.discAmt>0?[["Discount",`-$${fmt(totals.discAmt)}`,false]]:[]),
                       ["Total retail",          `$${fmt(totals.totalRetail)}`,  true],
+                      ...(totals.taxAmt>0?[["Tax",`+$${fmt(totals.taxAmt)}`,false]]:[]),
+                      ...(totals.taxAmt>0?[["Total w/ tax",`$${fmt(totals.totalWithTax)}`,true]]:[]),
                       ["Profit",                `$${fmt(totals.profit)}`,       true],
                       ["Margin",                `${fmt(totals.margin,1)}%`,     false],
                     ].map(([l,v,hi])=>(
@@ -655,9 +702,15 @@ export default function App() {
                       <span style={{fontSize:13,color:T.red,fontWeight:600}}>-${fmt(displayRec.discountAmt)}</span>
                     </div>
                   )}
+                  {(displayRec.taxAmt||0)>0 && (
+                    <div style={{display:"flex",gap:32}}>
+                      <span style={{fontSize:13,color:T.sub}}>Tax</span>
+                      <span style={{fontSize:13,color:T.text}}>+${fmt(displayRec.taxAmt)}</span>
+                    </div>
+                  )}
                   <div style={{display:"flex",gap:32,borderTop:`1px solid ${T.border}`,paddingTop:10,marginTop:4}}>
                     <span style={{fontSize:16,fontWeight:700}}>Total Due</span>
-                    <span style={{fontSize:22,fontWeight:700,color:T.gold}}>${fmt(displayRec.totalRetail)}</span>
+                    <span style={{fontSize:22,fontWeight:700,color:T.gold}}>${fmt(displayRec.totalWithTax||displayRec.totalRetail)}</span>
                   </div>
                   {displayRec.notes && (
                     <div style={{width:"100%",marginTop:6,padding:"8px 12px",background:T.bg,borderRadius:8,fontSize:13,color:T.sub,fontStyle:"italic"}}>
@@ -672,7 +725,8 @@ export default function App() {
                 <div style={cardSt({padding:"20px"})}>
                   <div style={{fontWeight:700,fontSize:16,marginBottom:4}}>Collect Payment</div>
                   <div style={{fontSize:14,color:T.sub,marginBottom:18}}>
-                    Total: <strong style={{color:T.gold,fontSize:20}}>${fmt(displayRec.totalRetail)}</strong>
+                    Total: <strong style={{color:T.gold,fontSize:20}}>${fmt(displayRec.totalWithTax||displayRec.totalRetail)}</strong>
+                    {(displayRec.taxAmt||0)>0 && <span style={{fontSize:12,color:T.dim,marginLeft:6}}>(incl. ${fmt(displayRec.taxAmt)} tax)</span>}
                   </div>
 
                   {!settings.paypal && !settings.venmo && !settings.cashapp ? (
@@ -733,6 +787,13 @@ export default function App() {
                       <Icon name="Check" size={16}/>Payment Received
                     </div>
                   )}
+
+                  {/* Email Invoice */}
+                  <button onClick={()=>emailInvoice(displayRec)} style={{
+                    ...btnGhost(false,{width:"100%",marginTop:10,padding:"11px",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",gap:8}),
+                  }}>
+                    <Icon name="Save" size={16}/>Send Invoice via Email
+                  </button>
                 </div>
 
                 {records.length>1 && (
@@ -803,6 +864,32 @@ export default function App() {
               <button onClick={()=>setTab("build")} style={btnPrimary({marginTop:12})}>Create First Order</button>
             </div>
           ) : (<>
+            {/* Today's summary */}
+            {(()=>{
+              const today = todayStr();
+              const todayRecs = records.filter(r=>r.date===today);
+              if (todayRecs.length===0) return null;
+              return (
+                <div style={{...cardSt({padding:"16px 20px",border:`1.5px solid ${T.borderAcc}`,marginBottom:16})}}>
+                  <div style={{fontSize:15,fontWeight:700,color:T.text,marginBottom:12}}>Today &mdash; {today}</div>
+                  <div style={{display:"grid",gridTemplateColumns:`repeat(${R.isMobile?2:4},1fr)`,gap:10}}>
+                    {[
+                      ["Sales",    todayRecs.length,                                              T.gold],
+                      ["Pieces",   todayRecs.reduce((a,r)=>a+r.pieces,0),                        T.sub],
+                      ["Revenue",  `$${fmt(todayRecs.reduce((a,r)=>a+r.totalRetail,0))}`,        T.gold],
+                      ["Profit",   `$${fmt(todayRecs.reduce((a,r)=>a+r.profit,0))}`,             T.green],
+                    ].map(([l,v,c])=>(
+                      <div key={l} style={{textAlign:"center"}}>
+                        <div style={{fontSize:11,color:T.sub,marginBottom:2}}>{l}</div>
+                        <div style={{fontSize:R.isMobile?16:20,fontWeight:700,color:c}}>{v}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* All-time stats */}
             <div style={{display:"grid",gridTemplateColumns:`repeat(${R.isMobile?2:4},1fr)`,gap:10,marginBottom:16}}>
               {[
                 ["Orders",    records.length,                                              T.gold],
@@ -850,6 +937,43 @@ export default function App() {
                 </div>
               ))}
             </div>
+            {/* Reorder Calculator */}
+            {reorderData.length>0 && (
+              <div style={{...cardSt({padding:"18px 20px",marginTop:16})}}>
+                <div style={{fontWeight:700,fontSize:16,marginBottom:12,display:"flex",alignItems:"center",gap:8}}>
+                  <Icon name="Tag" size={16} color={T.gold}/> Reorder Calculator
+                </div>
+                <p style={{fontSize:13,color:T.sub,marginBottom:12}}>Total usage across all orders — use this to plan your next JK Findings reorder.</p>
+                <div style={{overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
+                  <table style={{width:"100%",borderCollapse:"collapse",minWidth:400}}>
+                    <thead>
+                      <tr style={{borderBottom:`2px solid ${T.border}`}}>
+                        {["Item","Metal","Total Used","Unit","Est. Cost"].map(h=>(
+                          <th key={h} style={{padding:"7px 8px",textAlign:h==="Est. Cost"?"right":"left",fontSize:12,fontWeight:600,color:T.sub}}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {reorderData.map((d,i)=>(
+                        <tr key={i} style={{borderBottom:`1px solid ${T.border}`,background:i%2===0?"transparent":"#FDFBF7"}}>
+                          <td style={{padding:"8px",fontSize:13,color:T.text}}>{d.name}</td>
+                          <td style={{padding:"8px",fontSize:12,color:T.dim}}>{d.metal}</td>
+                          <td style={{padding:"8px",fontSize:13,fontWeight:600,color:T.text}}>{fmt(d.totalQty,d.unit==="each"?0:1)}</td>
+                          <td style={{padding:"8px",fontSize:12,color:T.dim}}>{d.unit}</td>
+                          <td style={{padding:"8px",fontSize:13,fontWeight:600,color:T.gold,textAlign:"right"}}>${fmt(d.totalQty*d.price)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr style={{borderTop:`2px solid ${T.border}`}}>
+                        <td colSpan="4" style={{padding:"8px",fontSize:14,fontWeight:700}}>Total Reorder Cost</td>
+                        <td style={{padding:"8px",fontSize:16,fontWeight:700,color:T.gold,textAlign:"right"}}>${fmt(reorderData.reduce((s,d)=>s+d.totalQty*d.price,0))}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+            )}
           </>)}
         </>)}
 
@@ -886,6 +1010,53 @@ export default function App() {
                 </div>
               ))}
             </div>
+            {/* Tax Settings */}
+            <div style={cardSt({padding:"20px"})}>
+              <div style={{fontWeight:700,fontSize:16,marginBottom:16}}>Sales Tax</div>
+              <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:12}}>
+                <button onClick={()=>saveSettings({...settings,taxEnabled:!settings.taxEnabled})} style={{
+                  width:48,height:26,borderRadius:13,border:"none",cursor:"pointer",
+                  background:settings.taxEnabled?T.green:"#D5CCB8",
+                  position:"relative",transition:"background 0.2s",
+                }}>
+                  <div style={{width:22,height:22,borderRadius:11,background:"#fff",position:"absolute",top:2,
+                    left:settings.taxEnabled?24:2,transition:"left 0.2s",boxShadow:"0 1px 3px rgba(0,0,0,0.2)"}}/>
+                </button>
+                <span style={{fontSize:15,color:T.text,fontWeight:600}}>
+                  {settings.taxEnabled ? "Tax enabled" : "Tax disabled"}
+                </span>
+              </div>
+              {settings.taxEnabled && (
+                <div>
+                  <label style={labelSt}>Tax Rate (%)</label>
+                  <input type="number" min="0" max="20" step="0.1"
+                    value={settings.taxRate||""} placeholder="6"
+                    onChange={e=>saveSettings({...settings,taxRate:parseFloat(e.target.value)||0})}
+                    style={inputSt({maxWidth:120})}/>
+                  <div style={{fontSize:12,color:T.dim,marginTop:4}}>Florida default: 6%</div>
+                </div>
+              )}
+            </div>
+
+            {/* Price Rounding */}
+            <div style={cardSt({padding:"20px"})}>
+              <div style={{fontWeight:700,fontSize:16,marginBottom:6}}>Price Rounding</div>
+              <p style={{fontSize:13,color:T.sub,marginBottom:12}}>Automatically round retail prices to clean numbers.</p>
+              <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                {[
+                  ["none","Off (exact)"],
+                  ["whole","Whole dollar ($35)"],
+                  ["99","X.99 ($34.99)"],
+                  ["95","X.95 ($34.95)"],
+                ].map(([val,label])=>(
+                  <button key={val} onClick={()=>saveSettings({...settings,priceRounding:val})} style={{
+                    ...btnGhost(settings.priceRounding===val),
+                    padding:"8px 14px",fontSize:13,
+                  }}>{label}</button>
+                ))}
+              </div>
+            </div>
+
             <div style={{...cardSt({padding:"16px",background:T.goldLight,border:`1px solid ${T.borderAcc}`})}}>
               <p style={{margin:0,fontSize:14,color:T.sub,lineHeight:1.6}}>
                 <strong style={{color:T.text}}>All data stays on this device.</strong> Records, templates, settings, and catalog items are saved in your browser's local storage. They persist when you close the app and reopen it. Clearing Safari website data will erase them.
