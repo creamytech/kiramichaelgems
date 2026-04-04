@@ -44,6 +44,7 @@ export default function App() {
   const [checkoutRec, setCheckoutRec] = useState(null);
   const [qrMethod,    setQrMethod]    = useState(null);
   const [qrFull,      setQrFull]      = useState(false);
+  const [customerView,setCustomerView]= useState(false);
   const [itemModal,   setItemModal]   = useState(null);
   const [showBrowser, setShowBrowser] = useState(false);
 
@@ -1749,6 +1750,17 @@ export default function App() {
               {/* ── Payment / Receipt Panel ── */}
               <div style={{display:"flex",flexDirection:"column",gap:14}}>
 
+                {/* Show to Customer button — always visible */}
+                <button onClick={()=>setCustomerView(true)} className="km-btn-press" style={{
+                  ...btnPrimary({width:"100%",padding:"16px",fontSize:17,borderRadius:14,marginBottom:14,
+                    display:"flex",alignItems:"center",justifyContent:"center",gap:10,
+                    background:"linear-gradient(135deg, #A040E0 0%, #8B2FC9 40%, #6B1FA0 100%)",
+                    boxShadow:"0 4px 20px rgba(139,47,201,0.3)",
+                  }),
+                }}>
+                  <Icon name="Expand" size={18}/>Show to Customer
+                </button>
+
                 {/* If NOT paid — show payment options */}
                 {!displayRec.paid && (
                   <div style={cardSt({padding:"22px",borderRadius:18})}>
@@ -1910,6 +1922,141 @@ export default function App() {
                   </button>
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* ── Customer-facing fullscreen view ── */}
+          {customerView && displayRec && (
+            <div style={{position:"fixed",inset:0,zIndex:250,background:"#fff",overflowY:"auto",WebkitOverflowScrolling:"touch"}}
+              onClick={e=>e.stopPropagation()}>
+              <style>{`
+                @keyframes cv-fadeUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+                @keyframes cv-pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.02)} }
+              `}</style>
+              {/* Purple gradient header */}
+              <div style={{background:"linear-gradient(135deg, #A040E0 0%, #8B2FC9 40%, #6B1FA0 100%)",
+                padding:"40px 24px 32px",textAlign:"center",color:"#fff",position:"relative"}}>
+                <img src="/IMG_7676.jpeg" alt="KM" style={{height:56,marginBottom:16,filter:"brightness(10)"}}/>
+                <div style={{fontSize:13,letterSpacing:2,textTransform:"uppercase",opacity:0.8,marginBottom:8}}>
+                  {displayRec.paid?"Thank You":"Your Order"}
+                </div>
+                <div style={{fontSize:28,fontWeight:700,letterSpacing:0.5,animation:"cv-fadeUp 0.5s ease-out"}}>
+                  {displayRec.customer}
+                </div>
+                {activeShowData && (
+                  <div style={{fontSize:12,opacity:0.7,marginTop:6}}>{activeShowData.name}</div>
+                )}
+              </div>
+
+              {/* Items list — clean, no costs visible */}
+              <div style={{padding:"24px 20px 0",maxWidth:480,margin:"0 auto"}}>
+                <div style={{fontSize:11,fontWeight:700,color:"#888",textTransform:"uppercase",letterSpacing:1,marginBottom:12}}>
+                  {displayRec.buildName}
+                </div>
+                {displayRec.lines.map((l,i)=>(
+                  <div key={i} style={{
+                    display:"flex",justifyContent:"space-between",alignItems:"center",
+                    padding:"14px 0",borderBottom:i<displayRec.lines.length-1?"1px solid #F0ECF4":"none",
+                    animation:`cv-fadeUp 0.4s ease-out ${0.1+i*0.05}s both`,
+                  }}>
+                    <div>
+                      <div style={{fontSize:16,fontWeight:600,color:"#1A1A1A"}}>{l.name}</div>
+                      <div style={{fontSize:13,color:"#888",marginTop:2}}>{l.metal} &middot; qty {l.qty}</div>
+                    </div>
+                    <div style={{fontSize:16,fontWeight:700,color:"#1A1A1A"}}>${fmt(l.lineCost * (displayRec.markup||2.5))}</div>
+                  </div>
+                ))}
+
+                {/* Totals */}
+                <div style={{borderTop:"2px solid #E4E0EA",marginTop:8,paddingTop:16}}>
+                  {(displayRec.discountAmt||0)>0 && (
+                    <div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",fontSize:14,color:"#C0392B"}}>
+                      <span>Discount</span><span>-${fmt(displayRec.discountAmt)}</span>
+                    </div>
+                  )}
+                  {(displayRec.taxAmt||0)>0 && (
+                    <div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",fontSize:14,color:"#888"}}>
+                      <span>Tax</span><span>${fmt(displayRec.taxAmt)}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Big total */}
+                <div style={{
+                  textAlign:"center",padding:"28px 0",
+                  animation:"cv-fadeUp 0.5s ease-out 0.3s both",
+                }}>
+                  <div style={{fontSize:11,fontWeight:700,color:"#888",textTransform:"uppercase",letterSpacing:1,marginBottom:8}}>
+                    {displayRec.paid?"Amount Paid":"Total Due"}
+                  </div>
+                  <div style={{fontSize:48,fontWeight:700,color:"#8B2FC9",letterSpacing:-1,
+                    animation:displayRec.paid?"none":"cv-pulse 2s ease-in-out infinite"}}>
+                    ${fmt(displayRec.totalWithTax||displayRec.totalRetail)}
+                  </div>
+                </div>
+
+                {/* QR code for payment (if unpaid and method selected) */}
+                {!displayRec.paid && qrMethod && PAY_METHODS.find(m=>m.key===qrMethod)?.link && (
+                  <div style={{textAlign:"center",marginBottom:24,animation:"cv-fadeUp 0.5s ease-out 0.4s both"}}>
+                    {PAY_METHODS.filter(m=>m.key===qrMethod&&m.link).map(m=>(
+                      <div key={m.key}>
+                        <div style={{border:`3px solid ${m.bg}`,borderRadius:16,padding:14,display:"inline-block",background:"#fff",marginBottom:12}}>
+                          <QRBox url={m.link} size={Math.min(220,window.innerWidth-100)}/>
+                        </div>
+                        <div style={{fontSize:15,fontWeight:600,color:m.bg,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+                          <Icon name={m.icon} size={18} color={m.bg}/>Scan to pay with {m.label}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Payment method buttons for customer (if unpaid, no QR selected) */}
+                {!displayRec.paid && !qrMethod && PAY_METHODS.length>0 && (
+                  <div style={{display:"flex",gap:8,marginBottom:24,flexWrap:"wrap",justifyContent:"center"}}>
+                    {PAY_METHODS.map(m=>(
+                      <a key={m.key} href={m.link} target="_blank" rel="noreferrer" style={{textDecoration:"none"}}>
+                        <button className="km-btn-press" style={{
+                          background:m.bg,color:"#fff",border:"none",borderRadius:12,
+                          padding:"14px 24px",fontSize:15,fontWeight:700,cursor:"pointer",
+                          display:"flex",alignItems:"center",gap:8,
+                          boxShadow:`0 4px 16px ${m.bg}40`,
+                        }}>
+                          <Icon name={m.icon} size={18} color="#fff"/>Pay with {m.label}
+                        </button>
+                      </a>
+                    ))}
+                  </div>
+                )}
+
+                {/* Paid state — thank you */}
+                {displayRec.paid && (
+                  <div style={{textAlign:"center",padding:"16px 0 24px",animation:"cv-fadeUp 0.5s ease-out 0.4s both"}}>
+                    <div style={{width:56,height:56,borderRadius:"50%",background:"#EAF6EF",display:"inline-flex",alignItems:"center",justifyContent:"center",marginBottom:12}}>
+                      <Icon name="Check" size={28} color="#2D7D4F"/>
+                    </div>
+                    <div style={{fontSize:18,fontWeight:700,color:"#2D7D4F"}}>Payment Complete</div>
+                    <div style={{fontSize:14,color:"#888",marginTop:4}}>Thank you for shopping with KM Gems!</div>
+                  </div>
+                )}
+
+                {/* Footer / branding */}
+                <div style={{textAlign:"center",padding:"20px 0 40px",borderTop:"1px solid #F0ECF4"}}>
+                  <img src="/IMG_7676.jpeg" alt="KM" style={{height:32,opacity:0.5,marginBottom:8}}/>
+                  <div style={{fontSize:11,color:"#AAA",letterSpacing:0.5}}>{displayRec.date}</div>
+                </div>
+              </div>
+
+              {/* Close button — small, top right (seller only sees this) */}
+              <button onClick={()=>setCustomerView(false)} style={{
+                position:"fixed",top:16,right:16,zIndex:260,
+                width:36,height:36,borderRadius:"50%",
+                background:"rgba(0,0,0,0.3)",border:"none",cursor:"pointer",
+                display:"flex",alignItems:"center",justifyContent:"center",
+                backdropFilter:"blur(4px)",
+              }}>
+                <Icon name="X" size={18} color="#fff"/>
+              </button>
             </div>
           )}
         </div>)}
