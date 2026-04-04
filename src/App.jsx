@@ -24,11 +24,16 @@ export default function App() {
 
   // Real-time sync: poll Supabase every 8s, update state when cloud changes
   const handleSync = useCallback((table, data) => {
-    if (!data) return;
-    if (table === "orders" && Array.isArray(data))    { setRecords(data); store.set("km-builds", data); }
-    if (table === "sellers" && Array.isArray(data))   { setSellers(data); store.set("km-sellers", data); }
-    if (table === "shows" && Array.isArray(data))     { setShows(data); store.set("km-shows", data); }
-    if (table === "inventory" && typeof data==="object" && !Array.isArray(data)) { setInventory(data); store.set("km-inventory", data); }
+    if (data === undefined || data === null) return;
+    switch(table) {
+      case "orders":    if (Array.isArray(data)) { setRecords(data); store.set("km-builds", data); } break;
+      case "sellers":   if (Array.isArray(data)) { setSellers(data); store.set("km-sellers", data); } break;
+      case "shows":     if (Array.isArray(data)) { setShows(data); store.set("km-shows", data); } break;
+      case "templates": if (Array.isArray(data)) { setTemplates(data); store.set("km-templates", data); } break;
+      case "items":     if (Array.isArray(data)) { setCustomItems(data); store.set("km-custom", data); } break;
+      case "inventory": if (typeof data==="object" && !Array.isArray(data)) { setInventory(data); store.set("km-inventory", data); } break;
+      case "settings":  if (typeof data==="object" && !Array.isArray(data)) { setSettings(prev=>({...prev,...data})); store.set("km-settings", data); } break;
+    }
   }, []);
   useRealtimeSync({ interval: 8000, onSync: handleSync });
 

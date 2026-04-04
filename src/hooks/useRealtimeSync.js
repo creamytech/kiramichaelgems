@@ -10,9 +10,10 @@ async function fetchDirect(table) {
     let q = supabase.from(table).select("*");
     if (!SINGLE_ROW.has(table)) q = q.order("id", { ascending: false });
     const { data, error } = await q;
-    if (error || !data || data.length === 0) return null;
-    if (SINGLE_ROW.has(table)) return data[0].data;
-    return data.map(r => r.data);
+    if (error) return null;
+    // For list tables, empty array means "all deleted" — that's valid data
+    if (SINGLE_ROW.has(table)) return data?.[0]?.data ?? null;
+    return (data || []).map(r => r.data);
   } catch { return null; }
 }
 
@@ -24,12 +25,14 @@ export default function useRealtimeSync({ interval = 8000, onSync }) {
     if (!supabase) return;
 
     async function poll() {
-      const tables = ["orders", "sellers", "shows", "inventory"];
+      // Sync ALL tables
+      const tables = ["orders", "sellers", "shows", "inventory", "templates", "items", "settings"];
       for (const table of tables) {
         try {
           const data = await fetchDirect(table);
           if (data === null) continue;
           const hash = JSON.stringify(data);
+          // On first poll, just record the hash. On subsequent polls, detect changes.
           if (lastHash.current[table] !== undefined && lastHash.current[table] !== hash) {
             onSync?.(table, data);
           }
