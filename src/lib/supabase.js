@@ -36,17 +36,18 @@ export async function dbLoad(table) {
   if (!supabase) return localStore.get(key);
 
   try {
-    const { data, error } = await supabase
-      .from(table)
-      .select("*")
-      .order("created_at", { ascending: false });
+    let query = supabase.from(table).select("*");
+    // Only order by created_at on list tables
+    if (table !== "settings" && table !== "inventory") {
+      query = query.order("created_at", { ascending: false });
+    }
+    const { data, error } = await query;
     if (error) throw error;
+    if (!data || data.length === 0) return localStore.get(key);
 
-    // For settings, return the single row's data field
-    if (table === "settings" && data.length > 0) return data[0].data;
-    // For inventory, return the single row's data field
-    if (table === "inventory" && data.length > 0) return data[0].data;
-    // For lists, return the array
+    // For single-row tables, return the data field
+    if (table === "settings" || table === "inventory") return data[0].data;
+    // For list tables, return array of data fields
     return data.map(r => r.data);
   } catch (err) {
     console.warn(`Supabase load failed for ${table}, falling back to local:`, err.message);

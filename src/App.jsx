@@ -49,27 +49,46 @@ export default function App() {
 
   useEffect(() => {
     async function init() {
-      // Load from Supabase if available, fall back to localStorage
-      const r = await dbLoad("orders")    || store.get("km-builds");
-      const t = await dbLoad("templates") || store.get("km-templates");
-      const c = await dbLoad("items")     || store.get("km-custom");
-      const s = await dbLoad("settings")  || store.get("km-settings");
-      const inv = await dbLoad("inventory") || store.get("km-inventory");
+      try {
+        // Try Supabase first, fall back to localStorage
+        const [r, t, c, s, inv] = await Promise.all([
+          dbLoad("orders").catch(() => null),
+          dbLoad("templates").catch(() => null),
+          dbLoad("items").catch(() => null),
+          dbLoad("settings").catch(() => null),
+          dbLoad("inventory").catch(() => null),
+        ]);
 
-      if (r && r.length) setRecords(r);
-      if (t && t.length) setTemplates(t);
-      if (c && c.length) setCustomItems(c);
-      if (s && Object.keys(s).length) setSettings(prev => ({...prev, ...s}));
-      if (inv && Object.keys(inv).length) setInventory(inv);
-      else { setInventory({...INITIAL_STOCK}); dbSave("inventory", {...INITIAL_STOCK}); }
+        const records_  = r && r.length ? r : store.get("km-builds");
+        const templates_= t && t.length ? t : store.get("km-templates");
+        const items_    = c && c.length ? c : store.get("km-custom");
+        const settings_ = s && Object.keys(s).length ? s : store.get("km-settings");
+        const inv_      = inv && Object.keys(inv).length ? inv : store.get("km-inventory");
 
-      // Cache locally too
-      if (r) store.set("km-builds", r);
-      if (t) store.set("km-templates", t);
-      if (c) store.set("km-custom", c);
-      if (s) store.set("km-settings", s);
-      if (inv) store.set("km-inventory", inv);
+        if (records_)   setRecords(records_);
+        if (templates_) setTemplates(templates_);
+        if (items_)     setCustomItems(items_);
+        if (settings_)  setSettings(prev => ({...prev, ...settings_}));
+        if (inv_)       setInventory(inv_);
+        else { setInventory({...INITIAL_STOCK}); dbSave("inventory", {...INITIAL_STOCK}).catch(()=>{}); }
 
+        // Cache locally
+        if (records_)   store.set("km-builds", records_);
+        if (templates_) store.set("km-templates", templates_);
+        if (items_)     store.set("km-custom", items_);
+        if (settings_)  store.set("km-settings", settings_);
+        if (inv_)       store.set("km-inventory", inv_);
+      } catch (err) {
+        // Total fallback: just load from localStorage
+        console.warn("Init failed, using localStorage:", err);
+        const r = store.get("km-builds");    if (r) setRecords(r);
+        const t = store.get("km-templates"); if (t) setTemplates(t);
+        const c = store.get("km-custom");    if (c) setCustomItems(c);
+        const s = store.get("km-settings");  if (s) setSettings(prev => ({...prev, ...s}));
+        const inv = store.get("km-inventory");
+        if (inv) setInventory(inv);
+        else setInventory({...INITIAL_STOCK});
+      }
       setLoading(false);
     }
     init();
