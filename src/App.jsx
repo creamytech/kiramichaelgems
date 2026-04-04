@@ -1185,7 +1185,7 @@ export default function App() {
   );
 
   return (
-    <div className={darkMode?"km-dark":""} style={{minHeight:"100vh",background:T.bg,fontFamily:"Georgia,'Times New Roman',serif",color:T.text,fontSize:15,transition:"background 0.3s, color 0.3s"}}>
+    <div className={darkMode?"km-dark":""} style={{minHeight:"100vh",background:T.bg,fontFamily:"Georgia,'Times New Roman',serif",color:T.text,fontSize:15,transition:"background 0.3s, color 0.3s",overflowX:"hidden",maxWidth:"100vw"}}>
 
       {/* PWA Install Prompt */}
       {showPwaPrompt && (
@@ -1208,37 +1208,36 @@ export default function App() {
       <header style={{
         background:T.headerGradient, borderBottom:`1px solid ${T.border}`,
         boxShadow:"0 1px 3px rgba(100,80,40,0.04), 0 4px 16px rgba(100,80,40,0.06)",
-        padding: R.isMobile ? "14px 16px" : "16px 28px",
-        display:"flex", alignItems:"center", justifyContent:"space-between",
+        padding: R.isMobile ? "10px 12px" : "14px 28px",
+        display:"flex", alignItems:"center", justifyContent:"space-between", gap:8,
         position:"sticky", top:0, zIndex:100,
         backdropFilter:"blur(12px)", WebkitBackdropFilter:"blur(12px)",
       }}>
-        <div style={{display:"flex",alignItems:"center",gap:8,minWidth:0,flex:1}}>
-          <img src="/IMG_7676.jpeg" alt="KM" style={{height:R.isMobile?32:42,width:"auto",objectFit:"contain",flexShrink:0}}/>
-          <div style={{minWidth:0,flex:1}}>
-            <div style={{display:"flex",alignItems:"center",gap:6}}>
-              <span style={{fontSize:R.isMobile?14:16,fontWeight:700,color:T.text}}>KM Gems</span>
+        <div style={{display:"flex",alignItems:"center",gap:8,minWidth:0}}>
+          <img src="/IMG_7676.jpeg" alt="KM" style={{height:R.isMobile?28:40,width:"auto",objectFit:"contain",flexShrink:0}}/>
+          <div style={{minWidth:0}}>
+            <div style={{display:"flex",alignItems:"center",gap:4}}>
+              <span style={{fontSize:R.isMobile?13:16,fontWeight:700,color:T.text}}>KM Gems</span>
               {activeSellerData && (
                 <button onClick={()=>{setActiveSeller(null);store.set("km-activeSeller",null);setSellerPicker(true);}} style={{
-                  background:T.accentLight,border:`1px solid ${T.accent}30`,borderRadius:14,
-                  padding:"2px 8px 2px 4px",cursor:"pointer",display:"flex",alignItems:"center",gap:3,
-                  fontSize:11,fontWeight:600,color:T.accent,fontFamily:"Georgia,serif",flexShrink:0,
+                  background:T.accentLight,border:"none",borderRadius:10,
+                  padding:"1px 6px",cursor:"pointer",display:"flex",alignItems:"center",gap:2,
+                  fontSize:10,fontWeight:600,color:T.accent,fontFamily:"Georgia,serif",flexShrink:0,
                 }}>
-                  <span style={{fontSize:13}}>{activeSellerData.emoji}</span>
+                  <span style={{fontSize:12}}>{activeSellerData.emoji}</span>
                   {R.isMobile ? "" : activeSellerData.name}
                 </button>
               )}
             </div>
             <button onClick={()=>setShowPicker(true)} style={{
               background:"none",border:"none",cursor:"pointer",padding:0,
-              fontSize:11,color:activeShowData?T.accent:T.dim,fontWeight:600,fontFamily:"Georgia,serif",
-              display:"flex",alignItems:"center",gap:3,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",
+              fontSize:10,color:activeShowData?T.accent:T.dim,fontWeight:600,fontFamily:"Georgia,serif",
+              display:"flex",alignItems:"center",gap:2,
             }}>
-              {activeShowData ? <><span style={{width:5,height:5,borderRadius:"50%",background:T.green,flexShrink:0}}/>{activeShowData.name}</> : "Tap to pick show"}
-              <Icon name="ChevronDown" size={10}/>
+              {activeShowData ? <><span style={{width:4,height:4,borderRadius:"50%",background:T.green,flexShrink:0}}/>{activeShowData.name}</> : "Tap to pick show"}
+              <Icon name="ChevronDown" size={9}/>
             </button>
           </div>
-          {isOnline() && !R.isMobile && <span style={{fontSize:10,color:T.green,flexShrink:0}}>&#9679;</span>}
         </div>
         {!R.isMobile && (
           <nav style={{display:"flex",gap:4,background:T.bg,borderRadius:12,padding:4,border:`1px solid ${T.border}`}}>
@@ -1276,7 +1275,7 @@ export default function App() {
         </div>
       )}
 
-      <main style={{maxWidth:1200,margin:"0 auto",padding:mainPad,paddingBottom:mainPB,animation:"km-tabEnter 0.35s ease-out"}}>
+      <main style={{maxWidth:1200,margin:"0 auto",padding:mainPad,paddingBottom:mainPB,animation:"km-tabEnter 0.35s ease-out",overflowX:"hidden"}}>
 
         {/* ══════════════ CATALOG TAB ══════════════ */}
         {tab==="catalog" && (<div key={tab} className="km-tab-panel">
@@ -1453,7 +1452,7 @@ export default function App() {
             </div>
           )}
 
-          <div style={{display:"grid",gridTemplateColumns:R.isMobile?"1fr":R.isTablet?"300px 1fr":"320px 1fr",gap:16,alignItems:"start"}}>
+          <div style={{display:"grid",gridTemplateColumns:R.isMobile?"1fr":R.isTablet?"300px 1fr":"320px 1fr",gap:R.isMobile?12:16,alignItems:"start"}}>
 
             {/* Item Browser — sidebar on desktop, inline on mobile */}
             <div style={{...cardSt({padding:"16px"}),position:R.isMobile?"static":"sticky",top:88}}>
