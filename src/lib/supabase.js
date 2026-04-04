@@ -7,9 +7,16 @@ import { createClient } from "@supabase/supabase-js";
 const supabaseUrl  = import.meta.env.VITE_SUPABASE_URL  || "";
 const supabaseAnon = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
 
-export const supabase = supabaseUrl && supabaseAnon
-  ? createClient(supabaseUrl, supabaseAnon)
-  : null;
+let _supabase = null;
+try {
+  if (supabaseUrl && supabaseAnon) {
+    _supabase = createClient(supabaseUrl, supabaseAnon);
+  }
+} catch (err) {
+  console.warn("Supabase client init failed:", err.message);
+  _supabase = null;
+}
+export const supabase = _supabase;
 
 export const isOnline = () => !!supabase;
 
