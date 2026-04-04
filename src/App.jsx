@@ -106,9 +106,22 @@ export default function App() {
           store.set("km-inventory", seed);
           dbSave("inventory", seed).catch(()=>{});
         }
+        const shows_   = sh && sh.length ? sh : store.get("km-shows");
         if (shows_ && shows_.length) setShows(shows_);
         const sellers_ = sl && sl.length ? sl : store.get("km-sellers");
         if (sellers_ && sellers_.length) setSellers(sellers_);
+
+        // Auto-push local data to cloud if cloud was empty but local has data
+        // This handles the case where SQL was re-run and wiped the cloud
+        const autoPush = [];
+        if (records_ && records_.length && (!r || !r.length))   autoPush.push(dbSave("orders", records_));
+        if (templates_&& templates_.length&& (!t || !t.length)) autoPush.push(dbSave("templates", templates_));
+        if (shows_ && shows_.length && (!sh || !sh.length))     autoPush.push(dbSave("shows", shows_));
+        if (sellers_ && sellers_.length && (!sl || !sl.length))  autoPush.push(dbSave("sellers", sellers_));
+        if (autoPush.length > 0) {
+          Promise.all(autoPush).catch(()=>{});
+          console.log(`Auto-pushed ${autoPush.length} tables to cloud (cloud was empty, local had data)`);
+        }
 
         // Restore active show + seller from localStorage
         const lastShow = store.get("km-activeShow");
