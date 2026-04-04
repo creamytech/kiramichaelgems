@@ -138,20 +138,18 @@ export default function App() {
   const [qsPhone,       setQsPhone]       = useState("");
   const [qsEmail,       setQsEmail]       = useState("");
 
-  // Handle Square POS callback
+  // Handle Square POS callback — check localStorage flag set by callback page
   useEffect(() => {
-    if (window.location.pathname === "/square-callback") {
-      const params = new URLSearchParams(window.location.search);
-      const status = params.get("data[status]") || params.get("status");
-      if (status === "ok") {
-        // Payment succeeded — mark most recent unpaid order as paid
-        const unpaid = records.find(r => !r.paid);
-        if (unpaid) markPaid(unpaid.id);
-        showToast("Square payment successful!");
-      }
-      // Clean up URL
-      window.history.replaceState({}, "", "/");
+    const squarePaid = store.get("km-square-paid");
+    if (squarePaid) {
+      // Clear the flag immediately
+      localStorage.removeItem("km-square-paid");
+      // Mark most recent unpaid order as paid
+      const unpaid = records.find(r => !r.paid);
+      if (unpaid) markPaid(unpaid.id);
+      showToast("Square payment successful!");
       setTab("checkout");
+    }
     }
   }, []);
 
