@@ -18,6 +18,7 @@ export default function App() {
   const [settings,   setSettings]   = useState({paypal:"",venmo:"",cashapp:"",bizName:"Kiramichael Gems",taxRate:0,taxEnabled:false,priceRounding:"none",lowStockThreshold:5});
   const [inventory,  setInventory]  = useState({});
 
+  const [loading,     setLoading]     = useState(true);
   const [tab,         setTab]         = useState("catalog");
   const [flash,       setFlash]       = useState("");
   const [tmplFlash,   setTmplFlash]   = useState("");
@@ -53,6 +54,8 @@ export default function App() {
     const inv = store.get("km-inventory");
     if (inv) setInventory(inv);
     else { setInventory({...INITIAL_STOCK}); store.set("km-inventory",{...INITIAL_STOCK}); }
+    // Brief splash so data settles + feels polished
+    setTimeout(() => setLoading(false), 1200);
   }, []);
 
   const saveSettings = s => { setSettings(s); store.set("km-settings",s); };
@@ -197,13 +200,19 @@ export default function App() {
   function saveCustomItem(form, existingId=null) {
     const price = form.unit==="per foot" ? parseFloat(form.price)/12 : parseFloat(form.price);
     const unit  = form.unit==="per foot" ? "per inch" : form.unit;
+    const stockQty = parseFloat(form.initialStock);
     if (existingId) {
       const u = customItems.map(i=>i.id===existingId?{...i,...form,price,unit,isCustom:true}:i);
       setCustomItems(u); store.set("km-custom",u);
+      if (!isNaN(stockQty) && stockQty >= 0) setStock(existingId, stockQty);
     } else {
       const newItem = {...form, price, unit, id:uid(), isCustom:true};
       const u = [...customItems, newItem];
       setCustomItems(u); store.set("km-custom",u);
+      if (!isNaN(stockQty) && stockQty >= 0) {
+        const inv = {...inventory, [newItem.id]: stockQty};
+        updateInventory(inv);
+      }
     }
     setItemModal(null);
   }
@@ -320,6 +329,53 @@ export default function App() {
   // ════════════════════════════════════════════════════════════════════════════
   // RENDER
   // ════════════════════════════════════════════════════════════════════════════
+
+  if (loading) return (
+    <div style={{
+      minHeight:"100vh",background:"linear-gradient(145deg, #FAF8F4 0%, #F5EDDA 50%, #FAF8F4 100%)",
+      display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
+      fontFamily:"Georgia,'Times New Roman',serif",
+    }}>
+      <style>{`
+        @keyframes km-pulse { 0%,100%{opacity:.4;transform:scale(.96)} 50%{opacity:1;transform:scale(1)} }
+        @keyframes km-shimmer { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
+        @keyframes km-fade { 0%{opacity:0;transform:translateY(8px)} 100%{opacity:1;transform:translateY(0)} }
+      `}</style>
+      <div style={{animation:"km-pulse 1.8s ease-in-out infinite",marginBottom:24}}>
+        <Icon name="Gem" size={56} color={T.gold}/>
+      </div>
+      <div style={{
+        fontSize:28,fontWeight:700,color:T.text,letterSpacing:0.5,marginBottom:6,
+        animation:"km-fade 0.6s ease-out both",
+      }}>
+        Kiramichael Gems
+      </div>
+      <div style={{
+        fontSize:14,color:T.dim,letterSpacing:2,textTransform:"uppercase",marginBottom:32,
+        animation:"km-fade 0.6s ease-out 0.2s both",
+      }}>
+        Build &middot; Price &middot; Sell
+      </div>
+      <div style={{
+        width:180,height:3,borderRadius:2,overflow:"hidden",
+        background:T.border,
+      }}>
+        <div style={{
+          width:"100%",height:"100%",borderRadius:2,
+          background:`linear-gradient(90deg, transparent, ${T.gold}, transparent)`,
+          backgroundSize:"200% 100%",
+          animation:"km-shimmer 1.2s ease-in-out infinite",
+        }}/>
+      </div>
+      <div style={{
+        fontSize:12,color:T.dim,marginTop:16,
+        animation:"km-fade 0.6s ease-out 0.4s both",
+      }}>
+        Loading catalog & inventory...
+      </div>
+    </div>
+  );
+
   return (
     <div style={{minHeight:"100vh",background:T.bg,fontFamily:"Georgia,'Times New Roman',serif",color:T.text,fontSize:15}}>
 
@@ -1227,6 +1283,7 @@ export default function App() {
       {itemModal && (
         <ItemModal
           item={typeof itemModal==="object" ? itemModal : null}
+          currentStock={typeof itemModal==="object" ? getStock(itemModal.id) : null}
           onSave={(form)=>saveCustomItem(form, typeof itemModal==="object" ? itemModal.id : null)}
           onCancel={()=>setItemModal(null)}
         />

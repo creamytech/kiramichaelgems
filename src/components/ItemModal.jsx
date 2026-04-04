@@ -3,12 +3,13 @@ import { CATS, UNITS } from "../data/catalog";
 import { T, fmt, cardSt, inputSt, labelSt, btnPrimary, btnGhost } from "../theme";
 import Icon from "./Icons";
 
-const BLANK_ITEM = { name:"", cat:"Chains", metal:"14KGF", unit:"each", price:"" };
+const BLANK_ITEM = { name:"", cat:"Chains", metal:"14KGF", unit:"each", price:"", initialStock:"" };
 
-export default function ItemModal({ item, onSave, onCancel }) {
-  const [form, setForm] = useState(item || BLANK_ITEM);
+export default function ItemModal({ item, onSave, onCancel, currentStock }) {
+  const [form, setForm] = useState(item ? {...item, initialStock:""} : BLANK_ITEM);
   const set = (k,v) => setForm(f=>({...f,[k]:v}));
   const valid = form.name.trim() && parseFloat(form.price) > 0;
+  const isNew = !item?.id;
 
   return (
     <div style={{position:"fixed",inset:0,zIndex:200,background:"rgba(0,0,0,0.5)",display:"flex",alignItems:"flex-end",justifyContent:"center"}}
@@ -16,7 +17,7 @@ export default function ItemModal({ item, onSave, onCancel }) {
       <div style={{...cardSt(),width:"100%",maxWidth:560,borderBottomLeftRadius:0,borderBottomRightRadius:0,padding:"24px 20px 36px",maxHeight:"92vh",overflowY:"auto"}}
         onClick={e=>e.stopPropagation()}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
-          <div style={{fontSize:18,fontWeight:700,color:T.text}}>{item?.id ? "Edit Item" : "Add New Item"}</div>
+          <div style={{fontSize:18,fontWeight:700,color:T.text}}>{isNew ? "Add New Item" : "Edit Item"}</div>
           <button onClick={onCancel} style={{background:"none",border:"none",cursor:"pointer",color:T.dim,padding:4}}>
             <Icon name="X" size={22}/>
           </button>
@@ -59,6 +60,24 @@ export default function ItemModal({ item, onSave, onCancel }) {
               Stored as ${fmt(parseFloat(form.price)/12,4)} per inch
             </div>
           )}
+
+          {/* Stock quantity */}
+          <div>
+            <label style={labelSt}>
+              {isNew ? "Starting Stock" : "Current Stock"}
+              {" "}({form.unit==="per foot"?"inches":form.unit==="per inch"?"inches":form.unit==="per gram"?"grams":"pieces"})
+            </label>
+            <input type="number" min="0" step={form.unit==="each"?1:0.1}
+              value={isNew ? (form.initialStock||"") : (currentStock!=null ? currentStock : "")}
+              onChange={e=>set("initialStock",e.target.value)}
+              placeholder={isNew ? "How many do you have?" : String(currentStock||0)}
+              style={inputSt()}/>
+            {!isNew && currentStock!=null && (
+              <div style={{fontSize:12,color:T.dim,marginTop:4}}>
+                Leave blank to keep current stock ({currentStock})
+              </div>
+            )}
+          </div>
         </div>
 
         <div style={{display:"flex",gap:10,marginTop:22}}>
@@ -67,7 +86,7 @@ export default function ItemModal({ item, onSave, onCancel }) {
             ...btnPrimary({flex:2,padding:"12px"}),
             background:valid?T.gold:"#C8BBA8",cursor:valid?"pointer":"default",
           }}>
-            {item?.id ? "Save Changes" : "Add to Catalog"}
+            {isNew ? "Add to Catalog" : "Save Changes"}
           </button>
         </div>
       </div>
