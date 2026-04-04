@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 340" fill="none">
+  <!-- K letter - bold black -->
+  <path d="M30 20h50v130l95-130h62L140 155l105 165h-64L95 175l-15 20v125H30V20z" fill="#1A1A1A"/>
+  <!-- M letter - gray, overlapping -->
+  <path d="M145 80h10l55 100 55-100h10l15 240h-40l-8-140-32 65h-2l-32-65-8 140h-40L145 80z" fill="#888888" opacity="0.75"/>
+  <!-- Purple heart swoosh -->
+  <path d="M200 60 C200 60, 165 20, 210 5 C255 -10, 310 15, 330 70 C355 140, 310 220, 220 300 C220 300, 215 290, 210 280"
+        stroke="#8B2FC9" stroke-width="14" stroke-linecap="round" fill="none"/>
+  <path d="M200 60 C200 60, 235 20, 190 5 C175 0, 165 5, 160 15"
+        stroke="#8B2FC9" stroke-width="14" stroke-linecap="round" fill="none"/>
+  <!-- Script text: Kira-Michael-Gems -->
+  <text x="225" y="310" font-family="Georgia, 'Times New Roman', serif" font-size="28" font-style="italic" font-weight="700" fill="#1A1A1A" letter-spacing="0.5" transform="rotate(-8, 225, 310)">Kira-Michael-Gems</text>
+</svg>

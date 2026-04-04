@@ -12,18 +12,25 @@ export default function ItemModal({ item, onSave, onCancel, currentStock }) {
   const isNew = !item?.id;
 
   return (
-    <div style={{position:"fixed",inset:0,zIndex:200,background:"rgba(0,0,0,0.5)",display:"flex",alignItems:"flex-end",justifyContent:"center"}}
+    <div style={{position:"fixed",inset:0,zIndex:200,background:"rgba(0,0,0,0.55)",backdropFilter:"blur(4px)",WebkitBackdropFilter:"blur(4px)",display:"flex",alignItems:"flex-end",justifyContent:"center",animation:"km-overlayIn 0.2s ease"}}
       onClick={onCancel}>
-      <div style={{...cardSt(),width:"100%",maxWidth:560,borderBottomLeftRadius:0,borderBottomRightRadius:0,padding:"24px 20px 36px",maxHeight:"92vh",overflowY:"auto"}}
+      <div style={{...cardSt(),width:"100%",maxWidth:560,borderBottomLeftRadius:0,borderBottomRightRadius:0,borderTopLeftRadius:20,borderTopRightRadius:20,padding:"28px 22px 36px",maxHeight:"92vh",overflowY:"auto",animation:"km-modalSlide 0.3s cubic-bezier(0.4,0,0.2,1)",boxShadow:T.shadowXl}}
         onClick={e=>e.stopPropagation()}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
-          <div style={{fontSize:18,fontWeight:700,color:T.text}}>{isNew ? "Add New Item" : "Edit Item"}</div>
-          <button onClick={onCancel} style={{background:"none",border:"none",cursor:"pointer",color:T.dim,padding:4}}>
-            <Icon name="X" size={22}/>
+        {/* Drag handle */}
+        <div style={{width:36,height:4,borderRadius:2,background:T.border,margin:"0 auto 18px"}}/>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:22}}>
+          <div>
+            <div style={{fontSize:19,fontWeight:700,color:T.text,letterSpacing:0.2}}>{isNew ? "Add New Item" : "Edit Item"}</div>
+            <div style={{fontSize:13,color:T.dim,marginTop:2}}>{isNew ? "Create a custom catalog item" : "Update item details"}</div>
+          </div>
+          <button onClick={onCancel} style={{background:T.bg,border:`1px solid ${T.border}`,borderRadius:8,cursor:"pointer",color:T.dim,padding:8,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.2s"}}
+            onMouseEnter={e=>{e.currentTarget.style.background=T.goldLight;e.currentTarget.style.borderColor=T.borderAcc;}}
+            onMouseLeave={e=>{e.currentTarget.style.background=T.bg;e.currentTarget.style.borderColor=T.border;}}>
+            <Icon name="X" size={18}/>
           </button>
         </div>
 
-        <div style={{display:"flex",flexDirection:"column",gap:14}}>
+        <div style={{display:"flex",flexDirection:"column",gap:16}}>
           <div>
             <label style={labelSt}>Item Name *</label>
             <input value={form.name} onChange={e=>set("name",e.target.value)} placeholder="e.g. 14mm Rolo Chain" style={inputSt()}/>
@@ -56,7 +63,7 @@ export default function ItemModal({ item, onSave, onCancel, currentStock }) {
             </div>
           </div>
           {form.unit==="per foot" && parseFloat(form.price)>0 && (
-            <div style={{fontSize:13,color:T.gold,background:T.goldLight,padding:"8px 12px",borderRadius:6}}>
+            <div style={{fontSize:13,color:T.gold,background:T.goldLight,padding:"10px 14px",borderRadius:8,border:`1px solid ${T.borderAcc}20`}}>
               Stored as ${fmt(parseFloat(form.price)/12,4)} per inch
             </div>
           )}
@@ -73,18 +80,19 @@ export default function ItemModal({ item, onSave, onCancel, currentStock }) {
               placeholder={isNew ? "How many do you have?" : String(currentStock||0)}
               style={inputSt()}/>
             {!isNew && currentStock!=null && (
-              <div style={{fontSize:12,color:T.dim,marginTop:4}}>
+              <div style={{fontSize:12,color:T.dim,marginTop:5}}>
                 Leave blank to keep current stock ({currentStock})
               </div>
             )}
           </div>
         </div>
 
-        <div style={{display:"flex",gap:10,marginTop:22}}>
-          <button onClick={onCancel} style={btnGhost(false,{flex:1,padding:"12px"})}>Cancel</button>
-          <button disabled={!valid} onClick={()=>onSave(form)} style={{
-            ...btnPrimary({flex:2,padding:"12px"}),
-            background:valid?T.gold:"#C8BBA8",cursor:valid?"pointer":"default",
+        <div style={{display:"flex",gap:10,marginTop:24}}>
+          <button onClick={onCancel} className="km-btn-press" style={btnGhost(false,{flex:1,padding:"13px"})}>Cancel</button>
+          <button disabled={!valid} className="km-btn-press" onClick={()=>onSave(form)} style={{
+            ...btnPrimary({flex:2,padding:"13px"}),
+            background:valid?T.goldGradient:"#C8BBA8",cursor:valid?"pointer":"default",
+            boxShadow:valid?T.shadowGold:"none",
           }}>
             {isNew ? "Add to Catalog" : "Save Changes"}
           </button>
