@@ -48,6 +48,7 @@ export default function App() {
   const [discount,      setDiscount]      = useState(0);
   const [discountType,  setDiscountType]  = useState("%");
   const [toast,         setToast]         = useState(null);
+  const [quickSell,     setQuickSell]     = useState(null); // item for quick sell modal
 
   useEffect(() => {
     const splashMin = new Promise(r => setTimeout(r, 1800)); // Show splash at least 1.8s
@@ -169,6 +170,37 @@ export default function App() {
       const item = ALL_ITEMS.find(i=>i.id===itemId);
       return [...prev, {itemId, qty:item?.unit==="per inch"?18:1}];
     });
+  }
+
+  function quickSellComplete(name, phone, email) {
+    const item = quickSell;
+    if (!item || !name.trim()) return;
+    const qty = item.unit==="per inch"?18:1;
+    const lineCost = item.price * qty;
+    const mk = markup;
+    const retail = lineCost * mk;
+    const rec = {
+      id:Date.now(), date:todayStr(),
+      buildName:item.name, customer:name.trim(),
+      email:email.trim(), phone:phone.trim(),
+      markup:mk, labor:0, pieces:1, discount:0, discountType:"%",
+      notes:"Quick sale",
+      lines:[{name:item.name,metal:item.metal,unit:item.unit,price:item.price,qty,lineCost}],
+      materialCost:lineCost, totalMaterial:lineCost,
+      totalLabor:0, retailBefore:retail, discountAmt:0,
+      totalRetail:retail, taxAmt:0, totalWithTax:retail,
+      profit:retail-lineCost, margin:retail>0?((retail-lineCost)/retail)*100:0,
+      rpp:retail, paid:false,
+    };
+    const inv = {...inventory};
+    if (inv[item.id]!==undefined) inv[item.id] = Math.max(0, inv[item.id]-qty);
+    updateInventory(inv);
+    const updated = [rec,...records];
+    setRecords(updated); store.set("km-builds",updated); dbSave("orders",updated);
+    setCheckoutRec(rec);
+    setQuickSell(null);
+    setTab("checkout");
+    showToast(`${item.name} — ready for payment`);
   }
   function updateQty(itemId, val) {
     const q = parseFloat(val);
@@ -518,14 +550,16 @@ export default function App() {
              invValue, invConsumed, invUsedPct, avgOrder, avgMargin, topSellers, dailyData };
   }, [records, inventory, ALL_ITEMS]);
 
-  const NAV = [
+  const NAV_FULL = [
     {id:"catalog",  label:"Catalog",   icon:"Grid"},
     {id:"build",    label:"Build",     icon:"Cart",   badge:buildItems.length||null},
-    {id:"checkout", label:"Checkout",  icon:"QR"},
+    {id:"checkout", label:"Pay",       icon:"QR"},
     {id:"dashboard",label:"Dashboard", icon:"Sparkle"},
     {id:"records",  label:"Records",   icon:"List",   badge:records.length||null},
     {id:"settings", label:"Settings",  icon:"Gear"},
   ];
+  // Mobile: 5 tabs (hide Records — accessible from Dashboard)
+  const NAV = R.isMobile ? NAV_FULL.filter(n=>n.id!=="records") : NAV_FULL;
 
   const mainPad = R.isMobile ? "16px 14px" : "24px 24px";
   const mainPB  = R.isMobile ? "90px" : "32px";
@@ -719,18 +753,25 @@ export default function App() {
                     <span style={{fontSize:R.isMobile?17:19,fontWeight:700,color:T.gold}}>${fmt(item.price,4)}</span>
                     <span style={{fontSize:11,color:T.dim,marginLeft:4}}>{item.unit}</span>
                   </div>
-                  <button onClick={()=>{addToBuild(item.id);setTab("build");}} className="km-btn-press" style={{
-                    background:getStock(item.id)<=0?"#EDEBF0":T.goldGradientLight,
-                    color:getStock(item.id)<=0?T.dim:T.gold,
-                    border:`1.5px solid ${getStock(item.id)<=0?T.border:T.borderAcc+"80"}`,
-                    borderRadius:8,padding:"7px 14px",cursor:"pointer",fontSize:13,fontWeight:600,
-                    display:"flex",alignItems:"center",gap:5,
-                    transition:"all 0.2s cubic-bezier(0.4,0,0.2,1)",
-                  }}
-                  onMouseEnter={e=>{if(getStock(item.id)>0){e.currentTarget.style.background=T.goldGradient;e.currentTarget.style.color="#fff";e.currentTarget.style.boxShadow=T.shadowGold;}}}
-                  onMouseLeave={e=>{e.currentTarget.style.background=getStock(item.id)<=0?"#EDEBF0":T.goldGradientLight;e.currentTarget.style.color=getStock(item.id)<=0?T.dim:T.gold;e.currentTarget.style.boxShadow="none";}}>
-                    <Icon name="Plus" size={13}/> Add
-                  </button>
+                  <div style={{display:"flex",gap:6}}>
+                    {item.unit==="each" && getStock(item.id)>0 && (
+                      <button onClick={()=>setQuickSell(item)} className="km-btn-press" style={{
+                        ...btnPrimary({padding:"7px 12px",fontSize:12,borderRadius:8}),
+                        display:"flex",alignItems:"center",gap:4,
+                      }}>
+                        <Icon name="Tag" size={12}/>Sell
+                      </button>
+                    )}
+                    <button onClick={()=>{addToBuild(item.id);setTab("build");}} className="km-btn-press" style={{
+                      background:getStock(item.id)<=0?"#EDEBF0":T.accentLight,
+                      color:getStock(item.id)<=0?T.dim:T.accent,
+                      border:`1.5px solid ${getStock(item.id)<=0?T.border:T.borderAcc+"60"}`,
+                      borderRadius:8,padding:"7px 12px",cursor:"pointer",fontSize:12,fontWeight:600,
+                      display:"flex",alignItems:"center",gap:4,
+                    }}>
+                      <Icon name="Plus" size={12}/> Build
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
@@ -741,7 +782,24 @@ export default function App() {
         {tab==="build" && (<div key={tab} className="km-tab-panel">
           <div style={{marginBottom:18}}>
             <h2 style={{margin:"0 0 3px",fontSize:R.isMobile?21:26,fontWeight:700,letterSpacing:0.3}}>New Order</h2>
-            <p style={{margin:0,color:T.sub,fontSize:14}}>Build a piece, price it, and send to checkout</p>
+            {/* Step indicator */}
+            <div style={{display:"flex",gap:4,marginTop:10}}>
+              {[
+                {n:1, label:"Add Items",    done:buildItems.length>0},
+                {n:2, label:"Customer",     done:customerName.trim().length>0},
+                {n:3, label:"Price & Save", done:false},
+              ].map(s=>(
+                <div key={s.n} style={{flex:1,display:"flex",alignItems:"center",gap:6,padding:"8px 10px",borderRadius:8,
+                  background:s.done?T.greenBg:T.bg,border:`1px solid ${s.done?T.green+"30":T.border}`,transition:"all 0.3s ease"}}>
+                  <div style={{width:22,height:22,borderRadius:"50%",fontSize:11,fontWeight:700,
+                    background:s.done?T.green:T.border,color:s.done?"#fff":T.dim,
+                    display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all 0.3s ease"}}>
+                    {s.done?"✓":s.n}
+                  </div>
+                  <span style={{fontSize:12,fontWeight:600,color:s.done?T.green:T.dim}}>{s.label}</span>
+                </div>
+              ))}
+            </div>
           </div>
 
           {templates.length>0 && (
@@ -1005,9 +1063,17 @@ export default function App() {
 
           {!displayRec ? (
             <div style={{...cardSt({padding:"48px 24px"}),textAlign:"center"}}>
-              <Icon name="Cart" size={40} color={T.border}/>
-              <p style={{color:T.sub,fontSize:16,marginTop:12}}>No order ready yet.</p>
-              <button onClick={()=>setTab("build")} style={btnPrimary({marginTop:12})}>Create an Order</button>
+              <Icon name="QR" size={48} color={T.border}/>
+              <p style={{fontSize:18,fontWeight:700,color:T.text,marginTop:16}}>Ready to collect payment?</p>
+              <p style={{color:T.sub,fontSize:14,marginTop:4}}>Build an order first, or quick-sell from the catalog</p>
+              <div style={{display:"flex",gap:10,justifyContent:"center",marginTop:16,flexWrap:"wrap"}}>
+                <button onClick={()=>setTab("catalog")} className="km-btn-press" style={btnPrimary({padding:"12px 24px",fontSize:15})}>
+                  <Icon name="Tag" size={16} color="#fff"/> Quick Sell
+                </button>
+                <button onClick={()=>setTab("build")} className="km-btn-press" style={btnGhost(false,{padding:"12px 24px",fontSize:15})}>
+                  Build Custom Order
+                </button>
+              </div>
             </div>
           ) : (
             <div style={{display:"grid",gridTemplateColumns:R.isMobile?"1fr":R.isTablet?"1fr":"1fr 360px",gap:16,alignItems:"start"}}>
@@ -1417,8 +1483,17 @@ export default function App() {
             <div style={{...cardSt({padding:"48px 24px"}),textAlign:"center"}}>
               <Icon name="Sparkle" size={40} color={T.border}/>
               <p style={{color:T.sub,fontSize:16,marginTop:12}}>Make your first sale to see analytics</p>
-              <button onClick={()=>setTab("build")} style={btnPrimary({marginTop:12})}>Create an Order</button>
+              <button onClick={()=>setTab("catalog")} className="km-btn-press" style={btnPrimary({marginTop:12})}>Start Selling</button>
             </div>
+          )}
+
+          {/* View all orders link (especially for mobile where Records tab is hidden) */}
+          {records.length>0 && (
+            <button onClick={()=>setTab("records")} className="km-btn-press" style={{
+              ...btnGhost(false,{width:"100%",marginTop:16,padding:"14px",fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",gap:8}),
+            }}>
+              <Icon name="List" size={16}/>View All {records.length} Orders
+            </button>
           )}
         </div>)}
 
@@ -1732,6 +1807,51 @@ export default function App() {
           onCancel={()=>setItemModal(null)}
         />
       )}
+
+      {/* Quick Sell modal */}
+      {quickSell && (()=>{
+        const item = quickSell;
+        const retail = item.price * (item.unit==="per inch"?18:1) * markup;
+        return (
+          <div style={{position:"fixed",inset:0,zIndex:200,background:"rgba(0,0,0,0.55)",backdropFilter:"blur(4px)",WebkitBackdropFilter:"blur(4px)",display:"flex",alignItems:"flex-end",justifyContent:"center",animation:"km-overlayIn 0.2s ease"}}
+            onClick={()=>setQuickSell(null)}>
+            <div style={{...cardSt(),width:"100%",maxWidth:480,borderBottomLeftRadius:0,borderBottomRightRadius:0,borderTopLeftRadius:20,borderTopRightRadius:20,padding:"28px 22px 36px",animation:"km-modalSlide 0.3s cubic-bezier(0.22,1,0.36,1)"}}
+              onClick={e=>e.stopPropagation()}>
+              <div style={{width:36,height:4,borderRadius:2,background:T.border,margin:"0 auto 20px"}}/>
+              <div style={{textAlign:"center",marginBottom:20}}>
+                <div style={{fontSize:20,fontWeight:700,color:T.text}}>{item.name}</div>
+                <div style={{fontSize:14,color:T.dim,marginTop:4}}>{item.metal} &middot; {item.cat}</div>
+                <div style={{fontSize:28,fontWeight:700,color:T.accent,marginTop:8}}>${fmt(retail)}</div>
+                <div style={{fontSize:12,color:T.dim}}>at {markup}x markup</div>
+              </div>
+              <div style={{display:"flex",flexDirection:"column",gap:12}}>
+                <div>
+                  <label style={labelSt}>Customer Name *</label>
+                  <input id="qs-name" placeholder="Full name" style={inputSt({fontSize:18,padding:"14px 16px"})} autoFocus/>
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                  <div>
+                    <label style={labelSt}>Phone</label>
+                    <input id="qs-phone" type="tel" placeholder="(555) 123-4567" style={inputSt()}/>
+                  </div>
+                  <div>
+                    <label style={labelSt}>Email</label>
+                    <input id="qs-email" type="email" placeholder="optional" style={inputSt()}/>
+                  </div>
+                </div>
+              </div>
+              <button className="km-btn-press" onClick={()=>{
+                const n=document.getElementById("qs-name")?.value;
+                const p=document.getElementById("qs-phone")?.value;
+                const e=document.getElementById("qs-email")?.value;
+                if(n?.trim()) quickSellComplete(n,p||"",e||"");
+              }} style={{...btnPrimary({width:"100%",padding:"16px",fontSize:17,marginTop:20,display:"flex",alignItems:"center",justifyContent:"center",gap:8})}}>
+                <Icon name="Check" size={18}/>Sell &mdash; ${fmt(retail)}
+              </button>
+            </div>
+          </div>
+        );
+      })()}
 
       <footer style={{textAlign:"center",padding:"24px 20px",color:T.dim,fontSize:12,borderTop:`1px solid ${T.border}`,display:R.isMobile?"none":"block",letterSpacing:0.3}}>
         <span style={{opacity:0.7}}>Kiramichael Gems &middot; JK Findings Invoice PI26-04970 &middot; March 24, 2026</span>
