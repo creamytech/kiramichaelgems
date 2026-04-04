@@ -233,6 +233,8 @@ export default function App() {
   function markPaid(id) {
     const u = records.map(r=>r.id===id?{...r,paid:true}:r);
     setRecords(u); store.set("km-builds",u); dbSave("orders",u);
+    // Update checkoutRec if it's the one being marked
+    if (checkoutRec?.id===id) setCheckoutRec({...checkoutRec, paid:true});
     showToast("Marked as paid");
   }
 
