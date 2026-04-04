@@ -10,7 +10,7 @@ import useResponsive from "./hooks/useResponsive";
 import QRBox from "./components/QRBox";
 import ItemModal from "./components/ItemModal";
 import { supabase, dbLoad, dbSave, dbMergeLoad, isOnline, testConnection, getDebugInfo } from "./lib/supabase";
-import { haptic, hapticSuccess, hapticError, hapticHeavy, hapticSelect } from "./utils/haptic";
+import useHaptics from "./hooks/useHaptics";
 
 const UNITS = ["each","per inch","per gram","per foot"];
 
@@ -18,6 +18,7 @@ export default function App() {
   const R = useResponsive();
   const metals = useMetalPrices();
   const geoTax = useGeoTax();
+  const { haptic, hapticSuccess, hapticError, hapticHeavy, hapticSelect, hapticSoft } = useHaptics();
   const netStatus = useOnlineStatus();
   const [darkMode, setDarkMode] = useState(() => store.get("km-darkmode") || false);
   const [pwaPrompt, setPwaPrompt] = useState(null);
