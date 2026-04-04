@@ -488,17 +488,12 @@ export default function App() {
         position:"sticky", top:0, zIndex:100,
         backdropFilter:"blur(12px)", WebkitBackdropFilter:"blur(12px)",
       }}>
-        <div style={{display:"flex",alignItems:"center",gap:12}}>
-          <div style={{background:T.goldGradientLight,borderRadius:10,padding:7,border:`1px solid ${T.borderAcc}30`,boxShadow:"0 1px 4px rgba(168,135,42,0.1)"}}>
-            <Icon name="Diamond" size={22} color={T.gold}/>
-          </div>
-          <div>
-            <div style={{fontSize:R.isMobile?17:20,fontWeight:700,color:T.text,letterSpacing:0.5}}>Kiramichael Gems</div>
-            {!R.isMobile && <div style={{fontSize:11,color:T.dim,letterSpacing:1.2}}>
-              Build Cost & Checkout Calculator
-              {isOnline() && <span style={{marginLeft:8,fontSize:10,color:T.green}}>&#9679; Synced</span>}
-            </div>}
-          </div>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <img src="/logo.svg" alt="KM" style={{height:R.isMobile?36:42,width:"auto"}}/>
+          {!R.isMobile && <div style={{fontSize:11,color:T.dim,letterSpacing:1.2}}>
+            Build Cost & Checkout Calculator
+            {isOnline() && <span style={{marginLeft:8,fontSize:10,color:T.green}}>&#9679; Synced</span>}
+          </div>}
         </div>
         {!R.isMobile && (
           <nav style={{display:"flex",gap:4,background:T.bg,borderRadius:12,padding:4,border:`1px solid ${T.border}`}}>
