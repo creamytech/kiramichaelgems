@@ -1,30 +1,26 @@
-import { T, fmt, btnPrimary, btnGhost } from "../theme";
+import { T, fmt } from "../theme";
 import Icon from "./Icons";
 
 const squareAppId = import.meta.env.VITE_SQUARE_APP_ID || "";
 
-// Square POS API — opens Square app on seller's phone, customer taps card
-// After payment, Square redirects back to KM Gems
 function buildSquarePOSUrl({ amount, note, callbackUrl }) {
   const amountCents = Math.round(amount * 100);
-  // iOS Square POS deep link
-  const params = new URLSearchParams({
-    "data[amount_money][amount]": String(amountCents),
-    "data[amount_money][currency_code]": "USD",
-    "data[callback_url]": callbackUrl,
-    "data[client_id]": squareAppId,
-    "data[version]": "1.3",
-    "data[options][supported_tender_types][]": "CREDIT_CARD,CASH,SQUARE_GIFT_CARD",
-  });
-  if (note) params.append("data[notes]", note);
-  return `square-commerce-v1://payment/create?${params.toString()}`;
-}
 
-// Square Online Checkout — creates a payment link customers can use
-function buildSquareCheckoutUrl({ amount, note }) {
-  // This uses Square's quick-pay link format
-  if (!squareAppId) return null;
-  return null; // We'll use POS API instead
+  const data = {
+    amount_money: {
+      amount: amountCents,
+      currency_code: "USD",
+    },
+    callback_url: callbackUrl,
+    client_id: squareAppId,
+    version: "1.3",
+    notes: note || "",
+    options: {
+      supported_tender_types: ["CREDIT_CARD", "CASH", "SQUARE_GIFT_CARD", "CARD_ON_FILE"],
+    },
+  };
+
+  return `square-commerce-v1://payment/create?data=${encodeURIComponent(JSON.stringify(data))}`;
 }
 
 export default function SquarePayment({ amount, description, customerName, onSuccess }) {
@@ -39,7 +35,6 @@ export default function SquarePayment({ amount, description, customerName, onSuc
 
   return (
     <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:12}}>
-      {/* Tap to Pay via Square POS app */}
       <a href={posUrl} style={{textDecoration:"none"}}>
         <button className="km-btn-press" style={{
           width:"100%",padding:"14px",fontSize:16,fontWeight:700,
@@ -52,11 +47,11 @@ export default function SquarePayment({ amount, description, customerName, onSuc
             <rect x="4" y="4" width="16" height="16" rx="3" fill="none" stroke="white" strokeWidth="1.5"/>
             <rect x="8" y="8" width="8" height="8" rx="1.5" fill="white"/>
           </svg>
-          Tap to Pay &mdash; ${fmt(amount)}
+          Tap to Pay — ${fmt(amount)}
         </button>
       </a>
       <div style={{textAlign:"center",fontSize:11,color:T.dim}}>
-        Opens Square app &mdash; customer taps card on your phone
+        Opens Square — customer taps card on your phone
       </div>
     </div>
   );
