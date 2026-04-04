@@ -4,15 +4,25 @@ const supabaseUrl  = import.meta.env.VITE_SUPABASE_URL  || "";
 const supabaseAnon = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
 
 let _supabase = null;
+let _initError = null;
 try {
   if (supabaseUrl && supabaseAnon) {
-    _supabase = createClient(supabaseUrl, supabaseAnon);
+    _supabase = createClient(supabaseUrl, supabaseAnon, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
   }
 } catch (err) {
+  _initError = err.message;
   console.warn("Supabase init failed:", err.message);
 }
 export const supabase = _supabase;
 export const isOnline = () => !!_supabase;
+export const getDebugInfo = () => ({
+  url: supabaseUrl ? supabaseUrl.slice(0, 30) + "..." : "not set",
+  keyPrefix: supabaseAnon ? supabaseAnon.slice(0, 20) + "..." : "not set",
+  client: !!_supabase,
+  initError: _initError,
+});
 
 // ─── Local storage fallback ─────────────────────────────────────────────────
 const local = {
@@ -37,12 +47,15 @@ export async function dbLoad(table) {
     let q = _supabase.from(table).select("*");
     if (!SINGLE_ROW.has(table)) q = q.order("id", { ascending: false });
     const { data, error } = await q;
-    if (error) throw error;
+    if (error) {
+      console.warn(`dbLoad(${table}) error:`, error.message, error.code, error.hint);
+      throw error;
+    }
     if (!data || data.length === 0) return local.get(key);
 
     if (SINGLE_ROW.has(table)) {
       const result = data[0].data;
-      local.set(key, result); // cache locally
+      local.set(key, result);
       return result;
     }
     const result = data.map(r => r.data);
@@ -51,6 +64,18 @@ export async function dbLoad(table) {
   } catch (err) {
     console.warn(`dbLoad(${table}) failed:`, err.message);
     return local.get(key);
+  }
+}
+
+// Test connection
+export async function testConnection() {
+  if (!_supabase) return { ok: false, error: "Client not initialized", debug: getDebugInfo() };
+  try {
+    const { data, error } = await _supabase.from("settings").select("id").limit(1);
+    if (error) return { ok: false, error: error.message, code: error.code, hint: error.hint, debug: getDebugInfo() };
+    return { ok: true, rows: data?.length ?? 0, debug: getDebugInfo() };
+  } catch (err) {
+    return { ok: false, error: err.message, debug: getDebugInfo() };
   }
 }
 

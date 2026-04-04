@@ -7,7 +7,7 @@ import Icon from "./components/Icons";
 import useResponsive from "./hooks/useResponsive";
 import QRBox from "./components/QRBox";
 import ItemModal from "./components/ItemModal";
-import { dbLoad, dbSave, isOnline } from "./lib/supabase";
+import { dbLoad, dbSave, isOnline, testConnection, getDebugInfo } from "./lib/supabase";
 
 const UNITS = ["each","per inch","per gram","per foot"];
 
@@ -2172,9 +2172,42 @@ export default function App() {
               </div>
             </div>
 
-            <div style={{...cardSt({padding:"16px",background:T.goldLight,border:`1px solid ${T.borderAcc}`})}}>
+            {/* Sync Debug */}
+            <div style={cardSt({padding:"20px"})}>
+              <div style={{fontWeight:700,fontSize:16,marginBottom:12}}>Cloud Sync</div>
+              <div style={{fontSize:13,color:T.sub,marginBottom:12}}>
+                Status: {isOnline() ? <span style={{color:T.green,fontWeight:700}}>Connected</span> : <span style={{color:T.red,fontWeight:700}}>Offline (localStorage only)</span>}
+              </div>
+              <button className="km-btn-press" onClick={async ()=>{
+                const result = await testConnection();
+                showToast(result.ok ? `Sync working! (${result.rows} rows)` : `Sync failed: ${result.error}`, result.ok?"success":"info");
+                console.log("Sync test:", JSON.stringify(result, null, 2));
+              }} style={{...btnGhost(false,{padding:"11px 18px",fontSize:14,display:"flex",alignItems:"center",gap:8,marginBottom:10})}}>
+                <Icon name="Check" size={15}/>Test Connection
+              </button>
+              <button className="km-btn-press" onClick={async ()=>{
+                showToast("Syncing all data...", "info");
+                await Promise.all([
+                  dbSave("orders", records),
+                  dbSave("templates", templates),
+                  dbSave("items", customItems),
+                  dbSave("settings", settings),
+                  dbSave("inventory", inventory),
+                  dbSave("shows", shows),
+                  dbSave("sellers", sellers),
+                ]);
+                showToast("All data pushed to cloud!");
+              }} style={{...btnPrimary({padding:"11px 18px",fontSize:14,display:"flex",alignItems:"center",gap:8})}}>
+                <Icon name="Save" size={15}/>Push All Data to Cloud
+              </button>
+              <pre style={{marginTop:12,padding:10,background:T.bg,borderRadius:8,fontSize:11,color:T.dim,overflow:"auto",maxHeight:100}}>
+                {JSON.stringify(getDebugInfo(), null, 2)}
+              </pre>
+            </div>
+
+            <div style={{...cardSt({padding:"16px",background:T.accentLight,border:`1px solid ${T.borderAcc}40`})}}>
               <p style={{margin:0,fontSize:14,color:T.sub,lineHeight:1.6}}>
-                <strong style={{color:T.text}}>All data stays on this device.</strong> Records, templates, settings, and catalog items are saved in your browser's local storage. They persist when you close the app and reopen it. Clearing Safari website data will erase them.
+                <strong style={{color:T.text}}>Data syncs to Supabase</strong> when connected. Local storage is used as a cache when offline. Tap "Push All Data" to force sync.
               </p>
             </div>
           </div>
