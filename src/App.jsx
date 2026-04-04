@@ -55,7 +55,7 @@ export default function App() {
   const [buildItems,    setBuildItems]    = useState([]);
   const [buildSearch,   setBuildSearch]   = useState("");
   const [buildCat,      setBuildCat]      = useState("All");
-  const [markup,        setMarkup]        = useState(2.5);
+  const [markup,        setMarkup]        = useState(6);
   const [labor,         setLabor]         = useState(0);
   const [pieces,        setPieces]        = useState(1);
   const [buildName,     setBuildName]     = useState("");
@@ -368,7 +368,7 @@ export default function App() {
 
   function loadTemplate(t) {
     setBuildItems(t.items);
-    setBuildName(t.name); setMarkup(t.markup??2.5); setLabor(t.labor??0);
+    setBuildName(t.name); setMarkup(t.markup??6); setLabor(t.labor??0);
     setDiscountType(t.discountType??"%"); setDiscount(0); setBuildNotes(t.notes??"");
     setCustomerName(""); setCustomerEmail(""); setCustomerPhone(""); setOrderDate(todayStr());
     if (R.isMobile) setShowBrowser(false);
@@ -626,7 +626,7 @@ export default function App() {
     const itemMap = {};
     recs.forEach(r => r.lines.forEach(l => {
       if (!itemMap[l.name]) itemMap[l.name] = { name:l.name, revenue:0, qty:0 };
-      itemMap[l.name].revenue += l.lineCost * (r.markup||2.5);
+      itemMap[l.name].revenue += l.lineCost * (r.markup||6);
       itemMap[l.name].qty += l.qty * (r.pieces||1);
     }));
     const top3 = Object.values(itemMap).sort((a,b) => b.revenue - a.revenue).slice(0,3);
@@ -814,7 +814,7 @@ export default function App() {
       const amt = r.totalWithTax || r.totalRetail;
       // First line item for this sale
       r.lines.forEach((l, i) => {
-        const lineAmt = +(l.lineCost * (r.markup||2.5) * (r.pieces||1)).toFixed(2);
+        const lineAmt = +(l.lineCost * (r.markup||6) * (r.pieces||1)).toFixed(2);
         rows.push({
           // Sales Receipt header fields (only on first line)
           "*SalesReceiptNo":  i===0 ? r.id : "",
@@ -828,7 +828,7 @@ export default function App() {
           "*ProductService":  l.name.replace(/[,"]/g,""),
           "Description":      `${l.metal} ${l.unit} — ${l.name}`,
           "*Qty":             +(l.qty * (r.pieces||1)).toFixed(2),
-          "*Rate":            +(l.price * (r.markup||2.5)).toFixed(4),
+          "*Rate":            +(l.price * (r.markup||6)).toFixed(4),
           "*Amount":          lineAmt,
           "ServiceDate":      r.date,
         });
@@ -947,7 +947,7 @@ export default function App() {
       r.lines.forEach(l => {
         const key = l.name;
         if (!itemSales[key]) itemSales[key] = { name:l.name, metal:l.metal, revenue:0, qty:0, orders:0 };
-        itemSales[key].revenue += l.lineCost * (r.markup||2.5) * (r.pieces||1);
+        itemSales[key].revenue += l.lineCost * (r.markup||6) * (r.pieces||1);
         itemSales[key].qty += l.qty * (r.pieces||1);
         itemSales[key].orders++;
       });
@@ -1572,9 +1572,9 @@ export default function App() {
                     <div>
                       <label style={labelSt}>Markup</label>
                       <div style={{display:"flex",gap:6,marginBottom:7}}>
-                        {[2,2.5,3,4].map(m=>(<button key={m} onClick={()=>setMarkup(m)} style={{...btnGhost(markup===m),flex:1,padding:"8px 0",fontSize:13}}>{m}x</button>))}
+                        {[2,3,4,6].map(m=>(<button key={m} onClick={()=>setMarkup(m)} style={{...btnGhost(markup===m),flex:1,padding:"8px 0",fontSize:13}}>{m}x</button>))}
                       </div>
-                      <input type="number" step="0.1" min="0" value={markup} onChange={e=>setMarkup(e.target.value===""?"":parseFloat(e.target.value))} onBlur={()=>{if(markup===""||isNaN(markup)||markup<1)setMarkup(2.5);}} style={inputSt()}/>
+                      <input type="number" step="0.1" min="0" value={markup} onChange={e=>setMarkup(e.target.value===""?"":parseFloat(e.target.value))} onBlur={()=>{if(markup===""||isNaN(markup)||markup<1)setMarkup(6);}} style={inputSt()}/>
                     </div>
                     <div>
                       <label style={labelSt}>Discount (optional)</label>
@@ -2000,7 +2000,7 @@ export default function App() {
                       <div style={{fontSize:16,fontWeight:600,color:"#1A1A1A"}}>{l.name}</div>
                       <div style={{fontSize:13,color:"#888",marginTop:2}}>{l.metal} &middot; qty {l.qty}</div>
                     </div>
-                    <div style={{fontSize:16,fontWeight:700,color:"#1A1A1A"}}>${fmt(l.lineCost * (displayRec.markup||2.5))}</div>
+                    <div style={{fontSize:16,fontWeight:700,color:"#1A1A1A"}}>${fmt(l.lineCost * (displayRec.markup||6))}</div>
                   </div>
                 ))}
 
