@@ -46,6 +46,7 @@ export default function App() {
   const [buildNotes,    setBuildNotes]    = useState("");
   const [discount,      setDiscount]      = useState(0);
   const [discountType,  setDiscountType]  = useState("%");
+  const [toast,         setToast]         = useState(null);
 
   useEffect(() => {
     const splashMin = new Promise(r => setTimeout(r, 1800)); // Show splash at least 1.8s
@@ -94,9 +95,19 @@ export default function App() {
     Promise.all([splashMin, loadData()]).then(() => setLoading(false));
   }, []);
 
-  const saveSettings = s => { setSettings(s); store.set("km-settings",s); dbSave("settings",s); };
+  const saveSettings = s => { setSettings(s); store.set("km-settings",s); dbSave("settings",s); showToast("Settings saved"); };
 
-  const ALL_ITEMS = useMemo(() => [...DEFAULT_ITEMS, ...customItems], [customItems]);
+  function showToast(msg, type="success") {
+    setToast({msg, type});
+    setTimeout(() => setToast(null), 2500);
+  }
+
+  const ALL_ITEMS = useMemo(() => {
+    const overrides = new Map(customItems.filter(c=>DEFAULT_ITEMS.find(d=>d.id===c.id)).map(c=>[c.id,c]));
+    const defaults = DEFAULT_ITEMS.map(d => overrides.has(d.id) ? {...d, ...overrides.get(d.id)} : d);
+    const customs = customItems.filter(c=>!DEFAULT_ITEMS.find(d=>d.id===c.id));
+    return [...defaults, ...customs];
+  }, [customItems]);
 
   const catalogItems = useMemo(() => {
     let list = ALL_ITEMS.filter(i =>
@@ -191,6 +202,7 @@ export default function App() {
     const updated = [rec,...records];
     setRecords(updated); store.set("km-builds",updated); dbSave("orders",updated);
     setFlash("saved"); setTimeout(()=>setFlash(""),2500);
+    showToast("Order saved — heading to checkout");
     setCheckoutRec(rec);
     setBuildItems([]); setCustomerName(""); setCustomerEmail("");
     setBuildName(""); setBuildNotes(""); setPieces(1); setDiscount(0);
@@ -220,12 +232,14 @@ export default function App() {
   function markPaid(id) {
     const u = records.map(r=>r.id===id?{...r,paid:true}:r);
     setRecords(u); store.set("km-builds",u); dbSave("orders",u);
+    showToast("Marked as paid");
   }
 
   function deleteRecord(id) {
     const u = records.filter(r=>r.id!==id);
     setRecords(u); store.set("km-builds",u); dbSave("orders",u);
     if (checkoutRec?.id===id) setCheckoutRec(null);
+    showToast("Order deleted", "info");
   }
 
   function deleteTemplate(id) {
@@ -305,12 +319,23 @@ export default function App() {
     const price = form.unit==="per foot" ? parseFloat(form.price)/12 : parseFloat(form.price);
     const unit  = form.unit==="per foot" ? "per inch" : form.unit;
     const stockQty = parseFloat(form.initialStock);
+    const image = form.image || "";
+
     if (existingId) {
-      const u = customItems.map(i=>i.id===existingId?{...i,...form,price,unit,isCustom:true}:i);
-      setCustomItems(u); store.set("km-custom",u); dbSave("items",u);
+      // Check if it's a default item being edited (add photo etc.)
+      const isDefault = DEFAULT_ITEMS.find(i=>i.id===existingId);
+      if (isDefault && !customItems.find(i=>i.id===existingId)) {
+        // Store as an override in customItems
+        const override = {...isDefault, ...form, price, unit, image, id:existingId, isCustom:false};
+        const u = [...customItems, override];
+        setCustomItems(u); store.set("km-custom",u); dbSave("items",u);
+      } else {
+        const u = customItems.map(i=>i.id===existingId?{...i,...form,price,unit,image,isCustom:i.isCustom??true}:i);
+        setCustomItems(u); store.set("km-custom",u); dbSave("items",u);
+      }
       if (!isNaN(stockQty) && stockQty >= 0) setStock(existingId, stockQty);
     } else {
-      const newItem = {...form, price, unit, id:uid(), isCustom:true};
+      const newItem = {...form, price, unit, image, id:uid(), isCustom:true};
       const u = [...customItems, newItem];
       setCustomItems(u); store.set("km-custom",u); dbSave("items",u);
       if (!isNaN(stockQty) && stockQty >= 0) {
@@ -319,6 +344,7 @@ export default function App() {
       }
     }
     setItemModal(null);
+    showToast(existingId ? "Item updated" : "Item added to catalog");
   }
 
   function deleteCustomItem(id) {
@@ -550,12 +576,15 @@ export default function App() {
         position:"sticky", top:0, zIndex:100,
         backdropFilter:"blur(12px)", WebkitBackdropFilter:"blur(12px)",
       }}>
-        <div style={{display:"flex",alignItems:"center",gap:10}}>
-          <img src="/IMG_7676.jpeg" alt="KM" style={{height:R.isMobile?36:42,width:"auto"}}/>
-          {!R.isMobile && <div style={{fontSize:11,color:T.dim,letterSpacing:1.2}}>
-            Build Cost & Checkout Calculator
-            {isOnline() && <span style={{marginLeft:8,fontSize:10,color:T.green}}>&#9679; Synced</span>}
-          </div>}
+        <div style={{display:"flex",alignItems:"center",gap:12}}>
+          <img src="/IMG_7676.jpeg" alt="KM" style={{height:R.isMobile?44:50,width:"auto",objectFit:"contain"}}/>
+          <div>
+            <div style={{fontSize:R.isMobile?15:17,fontWeight:700,color:T.text,letterSpacing:0.3}}>Kira-Michael Gems</div>
+            {!R.isMobile && <div style={{fontSize:11,color:T.dim,letterSpacing:0.8}}>
+              Build &middot; Price &middot; Sell
+              {isOnline() && <span style={{marginLeft:8,fontSize:10,color:T.green}}>&#9679; Synced</span>}
+            </div>}
+          </div>
         </div>
         {!R.isMobile && (
           <nav style={{display:"flex",gap:4,background:T.bg,borderRadius:12,padding:4,border:`1px solid ${T.border}`}}>
@@ -601,8 +630,8 @@ export default function App() {
             const warnItems = lowItems.filter(i=>getStock(i.id)>0);
             if (lowItems.length===0) return null;
             return (
-              <div style={{...cardSt({padding:"14px 18px",marginBottom:14,border:`1.5px solid ${outItems.length>0?T.red+"60":"#B8860B60"}`})}}>
-                <div style={{fontSize:14,fontWeight:700,color:outItems.length>0?T.red:"#B8860B",marginBottom:8}}>
+              <div style={{...cardSt({padding:"14px 18px",marginBottom:14,border:`1.5px solid ${outItems.length>0?T.red+"50":T.accent+"40"}`,background:outItems.length>0?"linear-gradient(135deg,#fff,#FDECEA)":"linear-gradient(135deg,#fff,#F3EAFA)"})}}>
+                <div style={{fontSize:14,fontWeight:700,color:outItems.length>0?T.red:T.accent,marginBottom:8}}>
                   {outItems.length>0 && `${outItems.length} out of stock`}
                   {outItems.length>0 && warnItems.length>0 && " · "}
                   {warnItems.length>0 && `${warnItems.length} running low`}
@@ -610,12 +639,12 @@ export default function App() {
                 <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                   {lowItems.map(i=>(
                     <span key={i.id} style={{
-                      fontSize:12,padding:"3px 10px",borderRadius:20,
-                      background:getStock(i.id)<=0?T.redBg:"#FFF8E1",
-                      color:getStock(i.id)<=0?T.red:"#B8860B",
-                      border:`1px solid ${getStock(i.id)<=0?T.red+"30":"#B8860B30"}`,
+                      fontSize:12,padding:"4px 10px",borderRadius:20,
+                      background:getStock(i.id)<=0?T.redBg:T.accentLight,
+                      color:getStock(i.id)<=0?T.red:T.accent,
+                      border:`1px solid ${getStock(i.id)<=0?T.red+"25":T.accent+"25"}`,
                     }}>
-                      {i.name} — {getStock(i.id)<=0?"OUT":`${i.unit==="each"?getStock(i.id):fmt(getStock(i.id),1)}${i.unit==="per inch"?'"':i.unit==="per gram"?"g":""}`}
+                      {i.name} &mdash; {getStock(i.id)<=0?"OUT":`${i.unit==="each"?getStock(i.id):fmt(getStock(i.id),1)}${i.unit==="per inch"?'"':i.unit==="per gram"?"g":""}`}
                     </span>
                   ))}
                 </div>
@@ -634,7 +663,7 @@ export default function App() {
               <button key={c} onClick={()=>setCatFilter(c)} className="km-btn-press" style={{
                 ...btnGhost(catFilter===c),
                 padding:"7px 14px",fontSize:13,whiteSpace:"nowrap",flexShrink:0,
-              }}>{c}{c!=="All" && <span style={{...tagSt(T.dim,"#F0EBE4"),marginLeft:6,fontSize:10,padding:"2px 7px"}}>{ALL_ITEMS.filter(i=>i.cat===c).length}</span>}</button>
+              }}>{c}{c!=="All" && <span style={{...tagSt(T.dim,"#EDEBF0"),marginLeft:6,fontSize:10,padding:"2px 7px"}}>{ALL_ITEMS.filter(i=>i.cat===c).length}</span>}</button>
             ))}
           </div>
           <div style={{display:"grid",gridTemplateColumns:`repeat(auto-fill,minmax(${R.isMobile?"160px":"260px"},1fr))`,gap:12}}>
@@ -642,16 +671,15 @@ export default function App() {
               <div key={item.id} className="km-card-hover" style={{...cardSt({padding:"16px 18px"}),position:"relative",cursor:"default"}}
                 onMouseEnter={e=>{e.currentTarget.style.borderColor=T.borderAcc+"60";}}
                 onMouseLeave={e=>{e.currentTarget.style.borderColor=T.border;}}>
-                {item.isCustom && (
-                  <div style={{position:"absolute",top:12,right:12,display:"flex",gap:3}}>
-                    <button onClick={()=>setItemModal(item)} style={{background:T.bg,border:`1px solid ${T.border}`,borderRadius:6,cursor:"pointer",color:T.dim,padding:4,display:"flex",alignItems:"center",transition:"all 0.15s"}}
-                      onMouseEnter={e=>{e.currentTarget.style.color=T.gold;e.currentTarget.style.borderColor=T.borderAcc;}}
-                      onMouseLeave={e=>{e.currentTarget.style.color=T.dim;e.currentTarget.style.borderColor=T.border;}}><Icon name="Edit" size={14}/></button>
-                    <button onClick={()=>deleteCustomItem(item.id)} style={{background:T.bg,border:`1px solid ${T.border}`,borderRadius:6,cursor:"pointer",color:T.dim,padding:4,display:"flex",alignItems:"center",transition:"all 0.15s"}}
-                      onMouseEnter={e=>{e.currentTarget.style.color=T.red;e.currentTarget.style.borderColor=T.red+"60";}}
-                      onMouseLeave={e=>{e.currentTarget.style.color=T.dim;e.currentTarget.style.borderColor=T.border;}}><Icon name="Trash" size={14}/></button>
-                  </div>
-                )}
+                <div style={{position:"absolute",top:12,right:12,display:"flex",gap:3}}>
+                  <button onClick={()=>setItemModal(item)} style={{background:T.bg,border:`1px solid ${T.border}`,borderRadius:6,cursor:"pointer",color:T.dim,padding:4,display:"flex",alignItems:"center",transition:"all 0.15s"}}
+                    onMouseEnter={e=>{e.currentTarget.style.color=T.accent;e.currentTarget.style.borderColor=T.borderAcc;}}
+                    onMouseLeave={e=>{e.currentTarget.style.color=T.dim;e.currentTarget.style.borderColor=T.border;}}><Icon name="Edit" size={14}/></button>
+                  {item.isCustom && <button onClick={()=>deleteCustomItem(item.id)} style={{background:T.bg,border:`1px solid ${T.border}`,borderRadius:6,cursor:"pointer",color:T.dim,padding:4,display:"flex",alignItems:"center",transition:"all 0.15s"}}
+                    onMouseEnter={e=>{e.currentTarget.style.color=T.red;e.currentTarget.style.borderColor=T.red+"60";}}
+                    onMouseLeave={e=>{e.currentTarget.style.color=T.dim;e.currentTarget.style.borderColor=T.border;}}><Icon name="Trash" size={14}/></button>}
+                </div>
+                {item.image && <img src={item.image} alt="" style={{width:"100%",height:120,objectFit:"cover",borderRadius:10,marginBottom:10,border:`1px solid ${T.border}`}}/>}
                 <div style={{fontSize:14,color:T.text,lineHeight:1.45,marginBottom:8,paddingRight:item.isCustom?48:0,fontWeight:600}}>{item.name}</div>
                 <div style={{display:"flex",gap:6,marginBottom:8,flexWrap:"wrap",alignItems:"center"}}>
                   <span style={tagSt()}>{item.cat}</span>
@@ -666,12 +694,12 @@ export default function App() {
                   const out = stock <= 0;
                   return (
                     <div style={{fontSize:11,fontWeight:600,marginBottom:10,padding:"5px 10px",borderRadius:8,
-                      background:out?T.redBg:low?"#FFF8E1":T.greenBg,
-                      color:out?T.red:low?"#B8860B":T.green,
+                      background:out?T.redBg:low?T.accentLight:T.greenBg,
+                      color:out?T.red:low?T.accent:T.green,
                       border:`1px solid ${out?T.red+"20":low?"#B8860B20":T.green+"20"}`,
                       display:"flex",alignItems:"center",gap:4,
                     }}>
-                      <span style={{width:5,height:5,borderRadius:"50%",background:out?T.red:low?"#B8860B":T.green,flexShrink:0}}/>
+                      <span style={{width:5,height:5,borderRadius:"50%",background:out?T.red:low?T.accent:T.green,flexShrink:0}}/>
                       {out ? "Out of stock" : `${item.unit==="each"?stock:fmt(stock,1)}${unitLabel} in stock`}
                       {low && !out && " — Low"}
                     </div>
@@ -683,7 +711,7 @@ export default function App() {
                     <span style={{fontSize:11,color:T.dim,marginLeft:4}}>{item.unit}</span>
                   </div>
                   <button onClick={()=>{addToBuild(item.id);setTab("build");}} className="km-btn-press" style={{
-                    background:getStock(item.id)<=0?"#F0EBE4":T.goldGradientLight,
+                    background:getStock(item.id)<=0?"#EDEBF0":T.goldGradientLight,
                     color:getStock(item.id)<=0?T.dim:T.gold,
                     border:`1.5px solid ${getStock(item.id)<=0?T.border:T.borderAcc+"80"}`,
                     borderRadius:8,padding:"7px 14px",cursor:"pointer",fontSize:13,fontWeight:600,
@@ -691,7 +719,7 @@ export default function App() {
                     transition:"all 0.2s cubic-bezier(0.4,0,0.2,1)",
                   }}
                   onMouseEnter={e=>{if(getStock(item.id)>0){e.currentTarget.style.background=T.goldGradient;e.currentTarget.style.color="#fff";e.currentTarget.style.boxShadow=T.shadowGold;}}}
-                  onMouseLeave={e=>{e.currentTarget.style.background=getStock(item.id)<=0?"#F0EBE4":T.goldGradientLight;e.currentTarget.style.color=getStock(item.id)<=0?T.dim:T.gold;e.currentTarget.style.boxShadow="none";}}>
+                  onMouseLeave={e=>{e.currentTarget.style.background=getStock(item.id)<=0?"#EDEBF0":T.goldGradientLight;e.currentTarget.style.color=getStock(item.id)<=0?T.dim:T.gold;e.currentTarget.style.boxShadow="none";}}>
                     <Icon name="Plus" size={13}/> Add
                   </button>
                 </div>
@@ -761,7 +789,7 @@ export default function App() {
                   }}>
                     <div>
                       <div style={{fontSize:13,color:T.text,lineHeight:1.3}}>{item.name}</div>
-                      <div style={{fontSize:11,color:T.dim,marginTop:1}}>{item.metal} &middot; {item.cat} &middot; <span style={{color:isLowStock(item.id)?getStock(item.id)<=0?T.red:"#B8860B":T.green,fontWeight:600}}>{item.unit==="each"?getStock(item.id):fmt(getStock(item.id),1)}{item.unit==="per inch"?'"':item.unit==="per gram"?"g":""}</span></div>
+                      <div style={{fontSize:11,color:T.dim,marginTop:1}}>{item.metal} &middot; {item.cat} &middot; <span style={{color:isLowStock(item.id)?getStock(item.id)<=0?T.red:T.accent:T.green,fontWeight:600}}>{item.unit==="each"?getStock(item.id):fmt(getStock(item.id),1)}{item.unit==="per inch"?'"':item.unit==="per gram"?"g":""}</span></div>
                     </div>
                     <div style={{textAlign:"right",flexShrink:0,marginLeft:10}}>
                       <div style={{fontSize:13,fontWeight:700,color:T.gold}}>${fmt(item.price,4)}</div>
@@ -1162,7 +1190,7 @@ export default function App() {
                         </div>
                         <div style={{textAlign:"right"}}>
                           <div style={{fontSize:13,fontWeight:600,color:T.gold}}>${fmt(r.totalRetail)}</div>
-                          <span style={tagSt(r.paid?T.green:T.dim,r.paid?T.greenBg:"#F0EBE4")}>{r.paid?"Paid":"Pending"}</span>
+                          <span style={tagSt(r.paid?T.green:T.dim,r.paid?T.greenBg:"#EDEBF0")}>{r.paid?"Paid":"Pending"}</span>
                         </div>
                       </div>
                     ))}
@@ -1291,9 +1319,9 @@ export default function App() {
                   <div style={{fontSize:12,color:T.sub}}>{dashboard.paidOrders.length} paid order{dashboard.paidOrders.length!==1?"s":""}</div>
                 </div>
                 {dashboard.pending>0 && (
-                  <div style={{padding:"16px",background:"#FFF8E1",borderRadius:12,border:"1px solid #F0D06020"}}>
-                    <div style={{fontSize:11,fontWeight:700,color:"#B8860B",textTransform:"uppercase",letterSpacing:0.5}}>Pending</div>
-                    <div style={{fontSize:24,fontWeight:700,color:"#B8860B"}}>${fmt(dashboard.pending)}</div>
+                  <div style={{padding:"16px",background:T.accentLight,borderRadius:12,border:"1px solid #F0D06020"}}>
+                    <div style={{fontSize:11,fontWeight:700,color:T.accent,textTransform:"uppercase",letterSpacing:0.5}}>Pending</div>
+                    <div style={{fontSize:24,fontWeight:700,color:T.accent}}>${fmt(dashboard.pending)}</div>
                     <div style={{fontSize:12,color:T.sub}}>{dashboard.pendingOrders.length} unpaid order{dashboard.pendingOrders.length!==1?"s":""}</div>
                   </div>
                 )}
@@ -1456,7 +1484,7 @@ export default function App() {
                           <div style={{fontSize:15,fontWeight:700,color:c}}>{v}</div>
                         </div>
                       ))}
-                      <span style={tagSt(r.paid?T.green:T.dim,r.paid?T.greenBg:"#F0EBE4")}>{r.paid?"Paid":"Pending"}</span>
+                      <span style={tagSt(r.paid?T.green:T.dim,r.paid?T.greenBg:"#EDEBF0")}>{r.paid?"Paid":"Pending"}</span>
                       <button onClick={()=>{setCheckoutRec(r);setTab("checkout");}} className="km-btn-press" style={{...btnGhost(false,{padding:"7px 12px",fontSize:13,display:"flex",alignItems:"center",gap:5})}}><Icon name="QR" size={14}/>Checkout</button>
                       <button onClick={()=>editOrder(r)} className="km-btn-press" style={{...btnGhost(false,{padding:"7px 12px",fontSize:13,display:"flex",alignItems:"center",gap:5})}}><Icon name="Edit" size={14}/>Edit</button>
                       <button onClick={()=>duplicateOrder(r)} className="km-btn-press" style={{...btnGhost(false,{padding:"7px 12px",fontSize:13,display:"flex",alignItems:"center",gap:5})}}><Icon name="Plus" size={14}/>Copy</button>
@@ -1554,7 +1582,7 @@ export default function App() {
               <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:12}}>
                 <button onClick={()=>saveSettings({...settings,taxEnabled:!settings.taxEnabled})} style={{
                   width:48,height:26,borderRadius:13,border:"none",cursor:"pointer",
-                  background:settings.taxEnabled?T.green:"#D5CCB8",
+                  background:settings.taxEnabled?T.accent:"#D0C4DC",
                   position:"relative",transition:"background 0.2s",
                 }}>
                   <div style={{width:22,height:22,borderRadius:11,background:"#fff",position:"absolute",top:2,
@@ -1619,7 +1647,7 @@ export default function App() {
                   const out = stock <= 0;
                   const unitLabel = item.unit==="per inch"?'"':item.unit==="per gram"?"g":"";
                   return (
-                    <div key={item.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",background:out?T.redBg:low?"#FFF8E1":"transparent",borderRadius:6,border:`1px solid ${out?T.red+"20":low?"#B8860B20":T.border}`}}>
+                    <div key={item.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",background:out?T.redBg:low?T.accentLight:"transparent",borderRadius:6,border:`1px solid ${out?T.red+"20":low?"#B8860B20":T.border}`}}>
                       <div style={{flex:1,fontSize:13,color:T.text}}>{item.name} <span style={{color:T.dim,fontSize:11}}>({item.metal})</span></div>
                       <div style={{display:"flex",alignItems:"center",gap:4}}>
                         <button onClick={()=>adjustStock(item.id,-1)} style={{width:26,height:26,borderRadius:6,border:`1px solid ${T.border}`,background:"none",cursor:"pointer",fontSize:16,fontWeight:700,color:T.dim,display:"flex",alignItems:"center",justifyContent:"center"}}>&minus;</button>
@@ -1688,6 +1716,23 @@ export default function App() {
       <footer style={{textAlign:"center",padding:"24px 20px",color:T.dim,fontSize:12,borderTop:`1px solid ${T.border}`,display:R.isMobile?"none":"block",letterSpacing:0.3}}>
         <span style={{opacity:0.7}}>Kiramichael Gems &middot; JK Findings Invoice PI26-04970 &middot; March 24, 2026</span>
       </footer>
+
+      {/* Toast notification */}
+      {toast && (
+        <div style={{
+          position:"fixed",top:R.isMobile?20:28,left:"50%",transform:"translateX(-50%)",zIndex:300,
+          background:toast.type==="info"?T.text:T.accent,
+          color:"#fff",padding:"12px 24px",borderRadius:12,
+          fontSize:14,fontWeight:600,fontFamily:"Georgia,serif",
+          boxShadow:T.shadowLg,
+          animation:"km-slideUp 0.3s cubic-bezier(0.4,0,0.2,1)",
+          display:"flex",alignItems:"center",gap:8,
+          maxWidth:"90vw",
+        }}>
+          <Icon name={toast.type==="info"?"Check":"Check"} size={16} color="#fff"/>
+          {toast.msg}
+        </div>
+      )}
     </div>
   );
 }

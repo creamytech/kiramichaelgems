@@ -1,13 +1,23 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { CATS, UNITS } from "../data/catalog";
 import { T, fmt, cardSt, inputSt, labelSt, btnPrimary, btnGhost } from "../theme";
 import Icon from "./Icons";
 
-const BLANK_ITEM = { name:"", cat:"Chains", metal:"14KGF", unit:"each", price:"", initialStock:"" };
+const BLANK_ITEM = { name:"", cat:"Chains", metal:"14KGF", unit:"each", price:"", initialStock:"", image:"" };
 
 export default function ItemModal({ item, onSave, onCancel, currentStock }) {
-  const [form, setForm] = useState(item ? {...item, initialStock:""} : BLANK_ITEM);
+  const [form, setForm] = useState(item ? {...item, initialStock:"", image:item.image||""} : BLANK_ITEM);
   const set = (k,v) => setForm(f=>({...f,[k]:v}));
+  const fileRef = useRef(null);
+
+  function handleImage(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 500000) { alert("Image too large — please use under 500KB"); return; }
+    const reader = new FileReader();
+    reader.onload = () => set("image", reader.result);
+    reader.readAsDataURL(file);
+  }
   const valid = form.name.trim() && parseFloat(form.price) > 0;
   const isNew = !item?.id;
 
@@ -84,6 +94,31 @@ export default function ItemModal({ item, onSave, onCancel, currentStock }) {
                 Leave blank to keep current stock ({currentStock})
               </div>
             )}
+          </div>
+
+          {/* Photo upload */}
+          <div>
+            <label style={labelSt}>Photo (optional)</label>
+            <input ref={fileRef} type="file" accept="image/*" onChange={handleImage}
+              style={{display:"none"}}/>
+            {form.image ? (
+              <div style={{position:"relative",display:"inline-block"}}>
+                <img src={form.image} alt="Item" style={{width:100,height:100,objectFit:"cover",borderRadius:10,border:`1px solid ${T.border}`}}/>
+                <button onClick={()=>set("image","")} style={{
+                  position:"absolute",top:-6,right:-6,width:22,height:22,borderRadius:"50%",
+                  background:T.red,color:"#fff",border:"none",cursor:"pointer",
+                  display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700,
+                }}>&times;</button>
+              </div>
+            ) : (
+              <button onClick={()=>fileRef.current?.click()} style={{
+                ...btnGhost(false,{padding:"14px 20px",fontSize:13,display:"flex",alignItems:"center",gap:8}),
+                borderStyle:"dashed",
+              }}>
+                <Icon name="Plus" size={16}/> Add Photo
+              </button>
+            )}
+            <div style={{fontSize:11,color:T.dim,marginTop:4}}>Max 500KB &middot; Stored in browser</div>
           </div>
         </div>
 
