@@ -583,7 +583,7 @@ export default function App() {
   // ── Seller management ───────────────────────────────────────────────────────
   function saveSellers(s) { setSellers(s); store.set("km-sellers",s); dbSave("sellers",s); }
   function createSeller(name, emoji) {
-    const s = { id:Date.now(), name:name.trim(), emoji:emoji||"💎" };
+    const s = { id:Date.now(), name:name.trim(), emoji:emoji||"Diamond2" };
     const u = [s,...sellers];
     saveSellers(u);
     setActiveSeller(s.id); store.set("km-activeSeller",s.id);
@@ -767,7 +767,7 @@ export default function App() {
   function receiptText(rec) {
     const amt = rec.totalWithTax || rec.totalRetail;
     const lines = rec.lines.map(l => `  ${l.name} (${l.metal}) x${l.qty} — $${fmt(l.lineCost)}`).join("\n");
-    return `${settings.bizName}\n${rec.paid?"Receipt":"Invoice"} — ${rec.date}\n\nCustomer: ${rec.customer}\nBuild: ${rec.buildName}\n\nItems:\n${lines}\n\nSubtotal: $${fmt(rec.totalRetail)}${(rec.taxAmt||0)>0?`\nTax: $${fmt(rec.taxAmt)}`:""}${(rec.discountAmt||0)>0?`\nDiscount: -$${fmt(rec.discountAmt)}`:""}\n\n${rec.paid?"Amount Paid":"Total Due"}: $${fmt(amt)}${rec.notes?`\n\nNote: ${rec.notes}`:""}\n\nThank you for your purchase! 💜`;
+    return `${settings.bizName}\n${rec.paid?"Receipt":"Invoice"} — ${rec.date}\n\nCustomer: ${rec.customer}\nBuild: ${rec.buildName}\n\nItems:\n${lines}\n\nSubtotal: $${fmt(rec.totalRetail)}${(rec.taxAmt||0)>0?`\nTax: $${fmt(rec.taxAmt)}`:""}${(rec.discountAmt||0)>0?`\nDiscount: -$${fmt(rec.discountAmt)}`:""}\n\n${rec.paid?"Amount Paid":"Total Due"}: $${fmt(amt)}${rec.notes?`\n\nNote: ${rec.notes}`:""}\n\nThank you for your purchase!`;
   }
 
   function emailInvoice(rec) {
@@ -1121,8 +1121,8 @@ export default function App() {
             textAlign:"left",background:"#fff",
           }}>
             <div style={{width:46,height:46,borderRadius:"50%",background:T.goldGradient,color:"#fff",
-              display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0}}>
-              {s.emoji||s.name.charAt(0)}
+              display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+              <Icon name={s.emoji||"Diamond2"} size={24} color="#fff"/>
             </div>
             <div>
               <div style={{fontSize:17,fontWeight:700,color:T.text}}>{s.name}</div>
@@ -1137,14 +1137,20 @@ export default function App() {
       {/* Create new profile */}
       <div style={{width:"100%",maxWidth:400,marginTop:20,padding:"20px",borderRadius:16,background:"#fff",border:`1px solid ${T.border}`,boxShadow:T.shadow}}>
         <div style={{fontSize:14,fontWeight:700,color:T.sub,marginBottom:10}}>New Profile</div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(5, 1fr)",gap:6,marginBottom:10}}>
+          {["Crown","Star","Heart","Flame","Lightning","Flower","Wave","Mountain","Moon2","Diamond2"].map(ic=>(
+            <button key={ic} type="button" onClick={()=>{document.getElementById("sp-emoji-val").value=ic;document.querySelectorAll("[data-sp-ic]").forEach(b=>b.style.borderColor=T.border);document.querySelector(`[data-sp-ic="${ic}"]`).style.borderColor=T.accent;}} data-sp-ic={ic} className="km-btn-press" style={{
+              display:"flex",alignItems:"center",justifyContent:"center",width:"100%",aspectRatio:"1",
+              borderRadius:10,border:`1.5px solid ${ic==="Diamond2"?T.accent:T.border}`,background:T.bg,cursor:"pointer",transition:"border-color 0.2s",
+            }}><Icon name={ic} size={20} color={T.accent}/></button>
+          ))}
+        </div>
+        <input type="hidden" id="sp-emoji-val" defaultValue="Diamond2"/>
         <div style={{display:"flex",gap:8}}>
-          <select id="sp-emoji" style={{...inputSt({width:60,padding:"10px 8px",fontSize:20,textAlign:"center"})}}>
-            {["💎","👑","✨","🌟","💜","🔮","💫","🦋","🌸","🎨"].map(e=><option key={e} value={e}>{e}</option>)}
-          </select>
           <input id="sp-name" placeholder="Your name" style={{...inputSt({flex:1,fontSize:16})}}/>
           <button className="km-btn-press" onClick={()=>{
             const n=document.getElementById("sp-name")?.value;
-            const e=document.getElementById("sp-emoji")?.value;
+            const e=document.getElementById("sp-emoji-val")?.value||"Diamond2";
             if(n?.trim()) createSeller(n,e);
           }} style={{...btnPrimary({padding:"10px 20px",fontSize:15,flexShrink:0})}}>
             Go
@@ -1170,7 +1176,7 @@ export default function App() {
       fontFamily:"Georgia,'Times New Roman',serif",padding:24,
     }}>
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:24}}>
-        <span style={{fontSize:28}}>{activeSellerData?.emoji}</span>
+        <Icon name={activeSellerData?.emoji||"Diamond2"} size={28} color={T.accent}/>
         <span style={{fontSize:18,fontWeight:700,color:T.text}}>Hey {activeSellerData?.name}!</span>
       </div>
       <div style={{fontSize:22,fontWeight:700,color:T.text,marginBottom:4}}>What show are you at?</div>
