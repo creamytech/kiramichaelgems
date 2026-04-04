@@ -1558,6 +1558,7 @@ export default function App() {
           </div>
 
           {/* ROI Hero Card */}
+          {records.length > 0 ? (
           <div style={{...cardSt({padding:"24px",marginBottom:16,border:`2px solid ${dashboard.netProfit>=0?T.green+"40":T.red+"40"}`,background:dashboard.netProfit>=0?"linear-gradient(135deg, #FFFFFF 0%, #EAF6EF 100%)":"linear-gradient(135deg, #FFFFFF 0%, #FDECEA 100%)"})}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:16}}>
               <div>
@@ -1587,6 +1588,20 @@ export default function App() {
               </div>
             </div>
           </div>
+          ) : (
+          <div style={{...cardSt({padding:"24px",marginBottom:16,background:T.accentLight,border:`1.5px solid ${T.accent}30`})}}>
+            <div style={{fontSize:12,fontWeight:700,color:T.accent,textTransform:"uppercase",letterSpacing:1,marginBottom:8}}>Break-Even Goal</div>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:12}}>
+              <div>
+                <div style={{fontSize:24,fontWeight:700,color:T.text}}>${fmt(INVOICE_TOTAL)}</div>
+                <div style={{fontSize:13,color:T.sub,marginTop:2}}>Total invested — make your first sale!</div>
+              </div>
+              <button onClick={()=>setTab("catalog")} className="km-btn-press" style={btnPrimary({padding:"12px 24px",fontSize:15})}>
+                Start Selling
+              </button>
+            </div>
+          </div>
+          )}
 
           {/* Live Metal Prices */}
           <div style={{display:"grid",gridTemplateColumns:R.isMobile?"1fr":"1fr 1fr",gap:12,marginBottom:16}}>
