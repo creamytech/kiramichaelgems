@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import * as XLSX from "xlsx";
 import { DEFAULT_ITEMS, CATS, INITIAL_STOCK, INVOICE_TOTAL, INVOICE_COST, INVOICE_FREIGHT, INVOICE_GOLD_OZ, INVOICE_SILVER_OZ, INVOICE_14KGF_COST, INVOICE_925AG_COST } from "./data/catalog";
 import useMetalPrices from "./hooks/useMetalPrices";
+import useGeoTax from "./hooks/useGeoTax";
 import { T, fmt, todayStr, uid, store, cardSt, inputSt, labelSt, btnPrimary, btnGhost, tagSt } from "./theme";
 import Icon from "./components/Icons";
 import useResponsive from "./hooks/useResponsive";
@@ -14,6 +15,7 @@ const UNITS = ["each","per inch","per gram","per foot"];
 export default function App() {
   const R = useResponsive();
   const metals = useMetalPrices();
+  const geoTax = useGeoTax();
 
   const [records,    setRecords]    = useState([]);
   const [templates,  setTemplates]  = useState([]);
@@ -453,6 +455,13 @@ export default function App() {
     setActiveShow(s.id); store.set("km-activeShow",s.id);
     setShowPicker(false);
     showToast(`"${s.name}" — let's sell!`);
+    // Auto-detect tax for this location
+    geoTax.detect().then(result => {
+      if (result?.taxRate && result.taxRate !== settings.taxRate) {
+        saveSettings({...settings, taxEnabled:true, taxRate:result.taxRate, taxCounty:result.county});
+        showToast(`Tax set to ${result.taxRate}% for ${result.county}`);
+      }
+    }).catch(()=>{});
   }
   function selectShow(id) {
     setActiveShow(id); store.set("km-activeShow",id);
@@ -2215,13 +2224,36 @@ export default function App() {
                 </span>
               </div>
               {settings.taxEnabled && (
-                <div>
-                  <label style={labelSt}>Tax Rate (%)</label>
-                  <input type="number" min="0" max="20" step="0.1"
-                    value={settings.taxRate||""} placeholder="6"
-                    onChange={e=>saveSettings({...settings,taxRate:parseFloat(e.target.value)||0})}
-                    style={inputSt({maxWidth:120})}/>
-                  <div style={{fontSize:12,color:T.dim,marginTop:4}}>Florida default: 6%</div>
+                <div style={{display:"flex",flexDirection:"column",gap:12}}>
+                  <div style={{display:"flex",gap:10,alignItems:"flex-end"}}>
+                    <div>
+                      <label style={labelSt}>Tax Rate (%)</label>
+                      <input type="number" min="0" max="20" step="0.1"
+                        value={settings.taxRate||""} placeholder="6"
+                        onChange={e=>saveSettings({...settings,taxRate:parseFloat(e.target.value)||0})}
+                        style={inputSt({maxWidth:100})}/>
+                    </div>
+                    <button className="km-btn-press" onClick={async ()=>{
+                      const result = await geoTax.detect();
+                      if (result.taxRate) {
+                        saveSettings({...settings, taxEnabled:true, taxRate:result.taxRate, taxCounty:result.county});
+                        showToast(`${result.note}`);
+                      } else {
+                        showToast(result.error || "Could not detect location", "info");
+                      }
+                    }} style={{...btnPrimary({padding:"10px 16px",fontSize:13,display:"flex",alignItems:"center",gap:6,whiteSpace:"nowrap"})}}>
+                      <Icon name="Sparkle" size={14}/>
+                      {geoTax.loading ? "Detecting..." : "Auto-Detect"}
+                    </button>
+                  </div>
+                  {settings.taxCounty && (
+                    <div style={{padding:"10px 14px",background:T.accentLight,borderRadius:8,fontSize:13,color:T.accent,fontWeight:600,border:`1px solid ${T.accent}20`}}>
+                      {settings.taxRate}% &mdash; {settings.taxCounty}
+                    </div>
+                  )}
+                  {!settings.taxCounty && (
+                    <div style={{fontSize:12,color:T.dim}}>Tap Auto-Detect to set your rate based on location, or enter manually</div>
+                  )}
                 </div>
               )}
             </div>
