@@ -911,15 +911,15 @@ export default function App() {
                   <div style={{fontWeight:700,fontSize:16,marginBottom:16,color:T.text}}>Pricing</div>
                   <div style={{display:"flex",flexDirection:"column",gap:13}}>
                     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-                      <div><label style={labelSt}>Pieces</label><input type="number" min="1" value={pieces} onChange={e=>setPieces(Math.max(1,parseInt(e.target.value)||1))} style={inputSt()}/></div>
-                      <div><label style={labelSt}>Labor / Piece ($)</label><input type="number" min="0" step="0.5" value={labor} onChange={e=>setLabor(parseFloat(e.target.value)||0)} style={inputSt()}/></div>
+                      <div><label style={labelSt}>Pieces</label><input type="number" min="0" value={pieces} onChange={e=>setPieces(e.target.value===""?"":parseInt(e.target.value))} onBlur={()=>{if(pieces===""||isNaN(pieces)||pieces<1)setPieces(1);}} style={inputSt()}/></div>
+                      <div><label style={labelSt}>Labor / Piece ($)</label><input type="number" min="0" step="0.5" value={labor} onChange={e=>setLabor(e.target.value===""?"":parseFloat(e.target.value))} onBlur={()=>{if(labor===""||isNaN(labor))setLabor(0);}} style={inputSt()}/></div>
                     </div>
                     <div>
                       <label style={labelSt}>Markup</label>
                       <div style={{display:"flex",gap:6,marginBottom:7}}>
                         {[2,2.5,3,4].map(m=>(<button key={m} onClick={()=>setMarkup(m)} style={{...btnGhost(markup===m),flex:1,padding:"8px 0",fontSize:13}}>{m}x</button>))}
                       </div>
-                      <input type="number" step="0.1" min="1" value={markup} onChange={e=>setMarkup(parseFloat(e.target.value)||1)} style={inputSt()}/>
+                      <input type="number" step="0.1" min="0" value={markup} onChange={e=>setMarkup(e.target.value===""?"":parseFloat(e.target.value))} onBlur={()=>{if(markup===""||isNaN(markup)||markup<1)setMarkup(2.5);}} style={inputSt()}/>
                     </div>
                     <div>
                       <label style={labelSt}>Discount (optional)</label>
@@ -927,7 +927,7 @@ export default function App() {
                         {["%","$"].map(t=>(<button key={t} onClick={()=>setDiscountType(t)} style={{flex:1,padding:"11px",border:"none",cursor:"pointer",fontSize:15,fontWeight:700,background:discountType===t?T.gold:"#F5F0EA",color:discountType===t?"#fff":T.sub,transition:"all 0.13s"}}>{t}</button>))}
                       </div>
                       <input type="number" min="0" step={discountType==="%"?1:0.5} max={discountType==="%"?100:undefined}
-                        value={discount||""} placeholder="0" onChange={e=>setDiscount(parseFloat(e.target.value)||0)} style={inputSt()}/>
+                        value={discount===""?"":discount} placeholder="0" onChange={e=>setDiscount(e.target.value===""?"":parseFloat(e.target.value))} onBlur={()=>{if(discount===""||isNaN(discount))setDiscount(0);}} style={inputSt()}/>
                       {discount>0 && totals.discAmt>0 && (
                         <div style={{marginTop:6,padding:"7px 10px",background:T.redBg,border:`1px solid ${T.red}20`,borderRadius:6,fontSize:13,color:T.red,fontWeight:600}}>
                           -{discountType==="%" ? discount+"%" : "$"+fmt(discount)} off &mdash; Customer pays ${fmt(totals.totalRetail)}

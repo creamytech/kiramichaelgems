@@ -119,6 +119,13 @@ input:focus, select:focus, textarea:focus {
   height: 1px;
 }
 
+/* Ensure SVG icons fill their container */
+span > svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
 /* Smooth transitions on all interactive elements */
 button, a, input, select, textarea {
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);

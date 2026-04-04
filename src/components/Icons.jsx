@@ -28,5 +28,5 @@ const Ic = {
 export default function Icon({ name, size=20, color="currentColor", className="" }) {
   const C = Ic[name];
   if (!C) return null;
-  return <span className={className} style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:size,height:size,color,flexShrink:0}}><C/></span>;
+  return <span className={className} style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:size,height:size,minWidth:size,minHeight:size,color,flexShrink:0,lineHeight:0}}><C/></span>;
 }
