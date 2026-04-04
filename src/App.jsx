@@ -9,6 +9,7 @@ import Icon from "./components/Icons";
 import useResponsive from "./hooks/useResponsive";
 import QRBox from "./components/QRBox";
 import ItemModal from "./components/ItemModal";
+import StripePayment from "./components/StripePayment";
 import { supabase, dbLoad, dbSave, isOnline, testConnection, getDebugInfo } from "./lib/supabase";
 import useHaptics from "./hooks/useHaptics";
 import useRealtimeSync from "./hooks/useRealtimeSync";
@@ -1986,6 +1987,19 @@ export default function App() {
                       style={{...btnGhost(false,{width:"100%",marginTop:8,padding:"11px",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",gap:8})}}>
                       <Icon name="Cash" size={16}/>Cash Payment
                     </button>
+
+                    {/* Stripe Card Payment */}
+                    <StripePayment
+                      amount={displayRec.totalWithTax||displayRec.totalRetail}
+                      description={`${displayRec.buildName} — KM Gems`}
+                      customerName={displayRec.customer}
+                      customerEmail={displayRec.email}
+                      onSuccess={(paymentId)=>{
+                        markPaid(displayRec.id);
+                        showToast("Card payment successful!");
+                      }}
+                      onCancel={()=>{}}
+                    />
                   </div>
                 )}
 
