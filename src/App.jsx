@@ -1239,43 +1239,42 @@ export default function App() {
         position:"sticky", top:0, zIndex:100,
         backdropFilter:"blur(12px)", WebkitBackdropFilter:"blur(12px)",
       }}>
-        {/* Left: logo + text */}
-        <div style={{display:"flex",alignItems:"center",gap:10,minWidth:0,flex:1}}>
-          <img src="/IMG_7676.jpeg" alt="KM" style={{height:R.isMobile?34:42,width:"auto",objectFit:"contain",flexShrink:0}}/>
-          <div style={{minWidth:0}}>
-            <div style={{fontSize:R.isMobile?15:18,fontWeight:700,color:T.text,lineHeight:1.2}}>KM Gems</div>
+        {/* Left: logo + name + show */}
+        <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
+          <img src="/IMG_7676.jpeg" alt="KM" style={{height:R.isMobile?34:36,width:"auto",objectFit:"contain",flexShrink:0}}/>
+          <div>
+            <div style={{fontSize:R.isMobile?15:16,fontWeight:700,color:T.text,lineHeight:1.1,whiteSpace:"nowrap"}}>KM Gems</div>
             <button onClick={()=>setShowPicker(true)} style={{
               background:"none",border:"none",cursor:"pointer",padding:0,marginTop:1,
-              fontSize:R.isMobile?11:12,color:activeShowData?T.accent:T.dim,fontWeight:500,fontFamily:"Georgia,serif",
-              display:"flex",alignItems:"center",gap:3,
+              fontSize:11,color:activeShowData?T.accent:T.dim,fontWeight:500,fontFamily:"Georgia,serif",
+              display:"flex",alignItems:"center",gap:3,whiteSpace:"nowrap",
             }}>
-              {activeShowData ? <><span style={{width:5,height:5,borderRadius:"50%",background:T.green,flexShrink:0}}/>{activeShowData.name}</> : "Tap to pick show"}
-              <Icon name="ChevronDown" size={10}/>
+              {activeShowData ? <><span style={{width:5,height:5,borderRadius:"50%",background:T.green,flexShrink:0}}/>{activeShowData.name}</> : "pick show"}
+              <Icon name="ChevronDown" size={9}/>
             </button>
           </div>
+          {activeSellerData && (
+            <button onClick={()=>{setActiveSeller(null);store.set("km-activeSeller",null);setSellerPicker(true);}} className="km-btn-press" style={{
+              background:T.accentLight,border:`1px solid ${T.accent}20`,borderRadius:16,
+              padding:"3px 10px 3px 5px",cursor:"pointer",
+              display:"flex",alignItems:"center",gap:4,flexShrink:0,
+              fontSize:12,fontWeight:600,color:T.accent,fontFamily:"Georgia,serif",whiteSpace:"nowrap",
+            }}>
+              <span style={{fontSize:15}}>{activeSellerData.emoji}</span>
+              {activeSellerData.name}
+            </button>
+          )}
         </div>
-        {/* Right: seller profile */}
-        {activeSellerData && (
-          <button onClick={()=>{setActiveSeller(null);store.set("km-activeSeller",null);setSellerPicker(true);}} className="km-btn-press" style={{
-            background:T.accentLight,border:`1px solid ${T.accent}25`,borderRadius:20,
-            padding:R.isMobile?"5px 10px 5px 6px":"6px 14px 6px 8px",cursor:"pointer",
-            display:"flex",alignItems:"center",gap:5,flexShrink:0,
-            fontSize:R.isMobile?12:13,fontWeight:600,color:T.accent,fontFamily:"Georgia,serif",
-          }}>
-            <span style={{fontSize:R.isMobile?16:18}}>{activeSellerData.emoji}</span>
-            {activeSellerData.name}
-          </button>
-        )}
         {!R.isMobile && (
-          <nav style={{display:"flex",gap:4,background:T.bg,borderRadius:12,padding:4,border:`1px solid ${T.border}`}}>
+          <nav style={{display:"flex",gap:2,background:T.bg,borderRadius:10,padding:3,border:`1px solid ${T.border}`}}>
             {NAV.map(n=>(
               <button key={n.id} onClick={()=>{setTab(n.id);hapticSelect();}} className="km-btn-press" style={{
                 background:tab===n.id?T.card:"transparent",
                 color:tab===n.id?T.gold:T.dim,
                 border:"none",
-                borderRadius:9,padding:"9px 16px",
-                cursor:"pointer",fontSize:14,fontFamily:"Georgia,serif",
-                display:"flex",alignItems:"center",gap:7,
+                borderRadius:7,padding:R.isTablet?"7px 10px":"8px 14px",
+                cursor:"pointer",fontSize:R.isTablet?12:13,fontFamily:"Georgia,serif",
+                display:"flex",alignItems:"center",gap:5,
                 position:"relative",
                 fontWeight:tab===n.id?600:400,
                 boxShadow:tab===n.id?T.shadow:"none",
