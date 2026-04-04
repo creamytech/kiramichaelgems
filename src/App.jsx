@@ -777,8 +777,8 @@ export default function App() {
     {id:"records",  label:"Records",   icon:"List",   badge:records.length||null},
     {id:"settings", label:"Settings",  icon:"Gear"},
   ];
-  // Mobile: 5 tabs (hide Records — accessible from Dashboard)
-  const NAV = R.isMobile ? NAV_FULL.filter(n=>n.id!=="records") : NAV_FULL;
+  // Mobile: 5 tabs (Settings accessible from Dashboard gear icon)
+  const NAV = R.isMobile ? NAV_FULL.filter(n=>n.id!=="settings") : NAV_FULL;
 
   const mainPad = R.isMobile ? "16px 14px" : "24px 24px";
   const mainPB  = R.isMobile ? "90px" : "32px";
@@ -1672,9 +1672,16 @@ export default function App() {
 
         {/* ══════════════ DASHBOARD TAB ══════════════ */}
         {tab==="dashboard" && (<div key={tab} className="km-tab-panel">
-          <div style={{marginBottom:16}}>
-            <h2 style={{margin:"0 0 2px",fontSize:R.isMobile?20:24,fontWeight:700}}>Dashboard</h2>
-            <p style={{margin:0,color:T.sub,fontSize:14}}>Real-time P&L from Invoice PI26-04970 &middot; Investment: ${fmt(INVOICE_TOTAL)}</p>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16}}>
+            <div>
+              <h2 style={{margin:"0 0 2px",fontSize:R.isMobile?20:24,fontWeight:700}}>Dashboard</h2>
+              <p style={{margin:0,color:T.sub,fontSize:14}}>Real-time P&L &middot; Investment: ${fmt(INVOICE_TOTAL)}</p>
+            </div>
+            {R.isMobile && (
+              <button onClick={()=>setTab("settings")} className="km-btn-press" style={{...btnGhost(false,{padding:"8px 12px",display:"flex",alignItems:"center",gap:6,fontSize:13})}}>
+                <Icon name="Gear" size={16}/>Settings
+              </button>
+            )}
           </div>
 
           {/* ROI Hero Card */}
