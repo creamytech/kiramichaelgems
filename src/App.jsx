@@ -562,7 +562,112 @@ export default function App() {
     ws["!cols"] = [10,22,18,36,8,10,12,6,12,8,8,12,20,14,12,10,6].map(w=>({wch:w}));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb,ws,"Orders");
-    XLSX.writeFile(wb,`KiramiGems_${new Date().toISOString().slice(0,10)}.xlsx`);
+    XLSX.writeFile(wb,`KMGems_${new Date().toISOString().slice(0,10)}.xlsx`);
+  }
+
+  function exportQuickBooks() {
+    // QBO Sales Receipt import format
+    const paidRecords = records.filter(r=>r.paid);
+    if (!paidRecords.length) { showToast("No paid orders to export", "info"); return; }
+
+    const rows = [];
+    paidRecords.forEach(r => {
+      const amt = r.totalWithTax || r.totalRetail;
+      // First line item for this sale
+      r.lines.forEach((l, i) => {
+        const lineAmt = +(l.lineCost * (r.markup||2.5) * (r.pieces||1)).toFixed(2);
+        rows.push({
+          // Sales Receipt header fields (only on first line)
+          "*SalesReceiptNo":  i===0 ? r.id : "",
+          "*SalesReceiptDate": r.date,
+          "*Customer":        i===0 ? r.customer : "",
+          "Email":            i===0 ? (r.email||"") : "",
+          "Phone":            i===0 ? (r.phone||"") : "",
+          "Memo":             i===0 ? `${r.buildName}${r.showName?" — "+r.showName:""}${r.sellerName?" ("+r.sellerName+")":""}` : "",
+          "PaymentMethod":    i===0 ? "Other" : "",
+          // Line item fields
+          "*ProductService":  l.name.replace(/[,"]/g,""),
+          "Description":      `${l.metal} ${l.unit} — ${l.name}`,
+          "*Qty":             +(l.qty * (r.pieces||1)).toFixed(2),
+          "*Rate":            +(l.price * (r.markup||2.5)).toFixed(4),
+          "*Amount":          lineAmt,
+          "ServiceDate":      r.date,
+        });
+      });
+      // Labor line if any
+      if ((r.totalLabor||0) > 0) {
+        rows.push({
+          "*SalesReceiptNo":"", "*SalesReceiptDate":r.date, "*Customer":"",
+          "Email":"","Phone":"","Memo":"","PaymentMethod":"",
+          "*ProductService":"Labor",
+          "Description":`Labor — ${r.pieces||1} piece${(r.pieces||1)>1?"s":""}`,
+          "*Qty":1, "*Rate":+r.totalLabor.toFixed(2), "*Amount":+r.totalLabor.toFixed(2),
+          "ServiceDate":r.date,
+        });
+      }
+      // Discount line if any
+      if ((r.discountAmt||0) > 0) {
+        rows.push({
+          "*SalesReceiptNo":"", "*SalesReceiptDate":r.date, "*Customer":"",
+          "Email":"","Phone":"","Memo":"","PaymentMethod":"",
+          "*ProductService":"Discount",
+          "Description":`Discount — ${r.discountType==="%"?r.discount+"%":"$"+fmt(r.discount)}`,
+          "*Qty":1, "*Rate":+(-r.discountAmt).toFixed(2), "*Amount":+(-r.discountAmt).toFixed(2),
+          "ServiceDate":r.date,
+        });
+      }
+      // Tax line if any
+      if ((r.taxAmt||0) > 0) {
+        rows.push({
+          "*SalesReceiptNo":"", "*SalesReceiptDate":r.date, "*Customer":"",
+          "Email":"","Phone":"","Memo":"","PaymentMethod":"",
+          "*ProductService":"Sales Tax",
+          "Description":"Tax",
+          "*Qty":1, "*Rate":+r.taxAmt.toFixed(2), "*Amount":+r.taxAmt.toFixed(2),
+          "ServiceDate":r.date,
+        });
+      }
+    });
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws["!cols"] = [16,14,20,24,14,30,12,28,36,8,10,12,14].map(w=>({wch:w}));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Sales Receipts");
+
+    // Also add a P&L summary sheet
+    const plRows = [
+      {"Category":"Revenue", "Amount":+paidRecords.reduce((s,r)=>s+(r.totalWithTax||r.totalRetail),0).toFixed(2)},
+      {"Category":"Cost of Goods Sold", "Amount":+paidRecords.reduce((s,r)=>s+(r.materialCost||0)*(r.pieces||1),0).toFixed(2)},
+      {"Category":"Labor", "Amount":+paidRecords.reduce((s,r)=>s+(r.totalLabor||0),0).toFixed(2)},
+      {"Category":"Discounts Given", "Amount":+paidRecords.reduce((s,r)=>s+(r.discountAmt||0),0).toFixed(2)},
+      {"Category":"Tax Collected", "Amount":+paidRecords.reduce((s,r)=>s+(r.taxAmt||0),0).toFixed(2)},
+      {"Category":"Gross Profit", "Amount":+paidRecords.reduce((s,r)=>s+r.profit,0).toFixed(2)},
+      {},
+      {"Category":"Total Orders", "Amount":paidRecords.length},
+      {"Category":"Total Pieces", "Amount":paidRecords.reduce((s,r)=>s+(r.pieces||1),0)},
+      {"Category":"Avg Order Value", "Amount":+(paidRecords.reduce((s,r)=>s+r.totalRetail,0)/paidRecords.length).toFixed(2)},
+    ];
+    const ws2 = XLSX.utils.json_to_sheet(plRows);
+    ws2["!cols"] = [{wch:20},{wch:14}];
+    XLSX.utils.book_append_sheet(wb, ws2, "P&L Summary");
+
+    // Customer list sheet
+    const customers = {};
+    paidRecords.forEach(r => {
+      if (!customers[r.customer]) customers[r.customer] = {name:r.customer,email:r.email||"",phone:r.phone||"",orders:0,total:0};
+      customers[r.customer].orders++;
+      customers[r.customer].total += (r.totalWithTax||r.totalRetail);
+    });
+    const custRows = Object.values(customers).sort((a,b)=>b.total-a.total).map(c=>({
+      "*Name":c.name, "Email":c.email, "Phone":c.phone,
+      "Orders":c.orders, "Total Spent ($)":+c.total.toFixed(2),
+    }));
+    const ws3 = XLSX.utils.json_to_sheet(custRows);
+    ws3["!cols"] = [{wch:24},{wch:26},{wch:16},{wch:8},{wch:14}];
+    XLSX.utils.book_append_sheet(wb, ws3, "Customers");
+
+    XLSX.writeFile(wb, `KMGems_QuickBooks_${new Date().toISOString().slice(0,10)}.xlsx`);
+    showToast(`Exported ${paidRecords.length} paid orders for QuickBooks`);
   }
 
   // ── Dashboard analytics ────────────────────────────────────────────────────
@@ -1924,12 +2029,15 @@ export default function App() {
               <p style={{margin:0,color:T.sub,fontSize:14}}>{records.length} order{records.length!==1?"s":""} &middot; Saved on this device</p>
             </div>
             {records.length>0 && (
-              <div style={{display:"flex",gap:8}}>
-                <button onClick={undoLastSale} className="km-btn-press" style={{...btnGhost(false,{borderColor:T.red+"60",color:T.red,padding:"10px 14px",fontSize:14,display:"flex",alignItems:"center",gap:6})}}>
-                  <Icon name="X" size={14}/>Undo Last
+              <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                <button onClick={exportQuickBooks} className="km-btn-press" style={{...btnPrimary({padding:"10px 16px",fontSize:13,display:"flex",alignItems:"center",gap:6})}}>
+                  <Icon name="Save" size={14}/>QuickBooks
                 </button>
-                <button onClick={exportExcel} className="km-btn-press" style={{...btnGhost(false,{borderColor:T.gold,color:T.gold,padding:"10px 18px",fontSize:14,display:"flex",alignItems:"center",gap:7})}}>
-                  <Icon name="Save" size={15}/>Export Excel
+                <button onClick={exportExcel} className="km-btn-press" style={{...btnGhost(false,{padding:"10px 14px",fontSize:13,display:"flex",alignItems:"center",gap:6})}}>
+                  <Icon name="Save" size={14}/>Excel
+                </button>
+                <button onClick={undoLastSale} className="km-btn-press" style={{...btnGhost(false,{borderColor:T.red+"60",color:T.red,padding:"10px 14px",fontSize:13,display:"flex",alignItems:"center",gap:6})}}>
+                  <Icon name="X" size={14}/>Undo
                 </button>
               </div>
             )}
