@@ -217,6 +217,14 @@ table tbody tr:hover {
   --km-dim: #777777;
   --km-border: #333333;
 }
+.km-dark input, .km-dark select, .km-dark textarea {
+  background: #2A2A2A !important;
+  color: #EEEAE6 !important;
+  border-color: #444 !important;
+}
+.km-dark input::placeholder, .km-dark textarea::placeholder {
+  color: #666 !important;
+}
 .km-dark table tbody tr:hover {
   background: #2A2A2A !important;
 }

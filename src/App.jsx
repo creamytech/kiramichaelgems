@@ -100,6 +100,7 @@ export default function App() {
   const [sellers,    setSellers]    = useState([]);     // seller profiles
   const [activeSeller,setActiveSeller]=useState(null);  // current seller id
   const [sellerPicker,setSellerPicker]=useState(true);  // show on startup
+  const [editingSeller,setEditingSeller]=useState(null); // seller id being edited
 
   const [loading,     setLoading]     = useState(true);
   const [tab,         setTab]         = useState("catalog");
@@ -648,6 +649,11 @@ export default function App() {
     const s = sellers.find(x=>x.id===id);
     if (s && activeShow) showToast(`Hey ${s.name}! Let's sell.`);
   }
+  function editSeller(id, name, icon) {
+    const u = sellers.map(s => s.id===id ? {...s, name:name.trim()||s.name, emoji:icon||s.emoji} : s);
+    saveSellers(u);
+    showToast("Profile updated");
+  }
   function deleteSeller(id) {
     if (!window.confirm("Delete this profile?")) return;
     saveSellers(sellers.filter(s=>s.id!==id));
@@ -1164,22 +1170,65 @@ export default function App() {
 
       <div style={{width:"100%",maxWidth:400,display:"flex",flexDirection:"column",gap:10}}>
         {sellers.map(s=>(
-          <button key={s.id} onClick={()=>pickSeller(s.id)} className="km-btn-press" style={{
-            ...cardSt({padding:"18px 20px"}),width:"100%",cursor:"pointer",
-            display:"flex",alignItems:"center",gap:14,border:`1.5px solid ${T.border}`,
-            textAlign:"left",background:"#fff",
-          }}>
-            <div style={{width:46,height:46,borderRadius:"50%",background:T.goldGradient,color:"#fff",
-              display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-              <Icon name={s.emoji||"Diamond2"} size={24} color="#fff"/>
-            </div>
-            <div>
-              <div style={{fontSize:17,fontWeight:700,color:T.text}}>{s.name}</div>
-              <div style={{fontSize:12,color:T.dim}}>
-                {records.filter(r=>r.sellerId===s.id).length} total sales
+          <div key={s.id} style={{...cardSt({padding:0,overflow:"hidden"}),width:"100%",border:`1.5px solid ${editingSeller===s.id?T.accent:T.border}`}}>
+            {editingSeller===s.id ? (
+              /* Edit mode */
+              <div style={{padding:"16px 18px"}} onClick={e=>e.stopPropagation()}>
+                <div style={{fontSize:13,fontWeight:700,color:T.sub,marginBottom:10}}>Edit Profile</div>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:4,marginBottom:10}}>
+                  {["Crown","Star","Heart","Flame","Lightning","Flower","Wave","Mountain","Moon2","Diamond2"].map(ic=>(
+                    <button key={ic} onClick={()=>{
+                      editSeller(s.id, s.name, ic);
+                    }}
+                      style={{padding:8,borderRadius:8,border:`1.5px solid ${(s.emoji||"Diamond2")===ic?T.accent:T.border}`,
+                        background:(s.emoji||"Diamond2")===ic?T.accentLight:"transparent",cursor:"pointer",
+                        display:"flex",alignItems:"center",justifyContent:"center"}}>
+                      <Icon name={ic} size={20} color={(s.emoji||"Diamond2")===ic?T.accent:T.dim}/>
+                    </button>
+                  ))}
+                </div>
+                <input id={`edit-name-${s.id}`} defaultValue={s.name} style={inputSt({fontSize:15,marginBottom:10})}/>
+                <div style={{display:"flex",gap:8}}>
+                  <button onClick={()=>{
+                    const name = document.getElementById(`edit-name-${s.id}`)?.value;
+                    editSeller(s.id, name||s.name, s.emoji);
+                    setEditingSeller(null);
+                  }} className="km-btn-press" style={{...btnPrimary({flex:1,padding:"10px",fontSize:14})}}>
+                    Save
+                  </button>
+                  <button onClick={()=>setEditingSeller(null)} className="km-btn-press" style={{...btnGhost(false,{padding:"10px 16px",fontSize:14})}}>
+                    Cancel
+                  </button>
+                  <button onClick={()=>{deleteSeller(s.id);setEditingSeller(null);}} className="km-btn-press" style={{...btnGhost(false,{padding:"10px",fontSize:14,borderColor:T.red+"40",color:T.red})}}>
+                    <Icon name="Trash" size={14}/>
+                  </button>
+                </div>
               </div>
-            </div>
-          </button>
+            ) : (
+              /* Normal mode */
+              <button onClick={()=>pickSeller(s.id)} className="km-btn-press" style={{
+                width:"100%",cursor:"pointer",padding:"18px 20px",background:"transparent",border:"none",
+                display:"flex",alignItems:"center",gap:14,textAlign:"left",fontFamily:"Georgia,serif",
+              }}>
+                <div style={{width:46,height:46,borderRadius:"50%",background:T.goldGradient,
+                  display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                  <Icon name={s.emoji||"Diamond2"} size={24} color="#fff"/>
+                </div>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:17,fontWeight:700,color:T.text}}>{s.name}</div>
+                  <div style={{fontSize:12,color:T.dim}}>
+                    {records.filter(r=>r.sellerId===s.id).length} total sales
+                  </div>
+                </div>
+                <button onClick={e=>{e.stopPropagation();setEditingSeller(s.id);}} style={{
+                  background:T.bg,border:`1px solid ${T.border}`,borderRadius:8,padding:6,cursor:"pointer",
+                  display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,
+                }}>
+                  <Icon name="Edit" size={14} color={T.dim}/>
+                </button>
+              </button>
+            )}
+          </div>
         ))}
       </div>
 
