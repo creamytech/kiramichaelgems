@@ -1,8 +1,21 @@
 import { useEffect, useRef } from "react";
-import { supabase, dbLoad } from "../lib/supabase";
-import { store } from "../theme";
+import { supabase } from "../lib/supabase";
 
-// Polls Supabase every N seconds and updates state if cloud data changed
+const SINGLE_ROW = new Set(["settings", "inventory"]);
+
+// Fetches directly from Supabase, NO cache
+async function fetchDirect(table) {
+  if (!supabase) return null;
+  try {
+    let q = supabase.from(table).select("*");
+    if (!SINGLE_ROW.has(table)) q = q.order("id", { ascending: false });
+    const { data, error } = await q;
+    if (error || !data || data.length === 0) return null;
+    if (SINGLE_ROW.has(table)) return data[0].data;
+    return data.map(r => r.data);
+  } catch { return null; }
+}
+
 export default function useRealtimeSync({ interval = 8000, onSync }) {
   const timer = useRef(null);
   const lastHash = useRef({});
@@ -11,27 +24,27 @@ export default function useRealtimeSync({ interval = 8000, onSync }) {
     if (!supabase) return;
 
     async function poll() {
-      try {
-        const tables = ["orders", "sellers", "shows", "inventory"];
-        for (const table of tables) {
-          const data = await dbLoad(table);
+      const tables = ["orders", "sellers", "shows", "inventory"];
+      for (const table of tables) {
+        try {
+          const data = await fetchDirect(table);
+          if (data === null) continue;
           const hash = JSON.stringify(data);
-          if (lastHash.current[table] && lastHash.current[table] !== hash) {
-            // Data changed in cloud — notify app
+          if (lastHash.current[table] !== undefined && lastHash.current[table] !== hash) {
             onSync?.(table, data);
           }
           lastHash.current[table] = hash;
-        }
-      } catch {}
+        } catch {}
+      }
     }
 
-    // Initial hash
+    // Initial snapshot
     poll();
 
-    // Poll on interval
+    // Poll every interval
     timer.current = setInterval(poll, interval);
 
-    // Also poll when tab becomes visible (user switches back to app)
+    // Also poll when app regains focus
     function onVisible() {
       if (document.visibilityState === "visible") poll();
     }

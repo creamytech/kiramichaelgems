@@ -80,48 +80,19 @@ export async function dbSave(table, value) {
         .upsert({ id: 1, data: value, updated_at: new Date().toISOString() });
       if (error) throw error;
     } else {
-      // MERGE strategy: fetch existing from cloud, merge with local, write back
-      const { data: existing } = await _supabase.from(table).select("record_id, id").catch(() => ({ data: [] }));
-      const existingIds = new Set((existing || []).map(r => r.record_id));
+      // Simple: delete all then reinsert
+      const { error: delErr } = await _supabase.from(table).delete().gte("id", 0);
+      if (delErr) console.warn(`dbSave delete ${table}:`, delErr.message);
 
-      // Build the full list: local items are the source of truth for items we know about
-      const localIds = new Set();
-      const toUpsert = [];
-
-      if (Array.isArray(value)) {
-        value.forEach(item => {
-          const rid = String(item.id || "");
-          localIds.add(rid);
-          toUpsert.push({
-            record_id: rid,
+      if (Array.isArray(value) && value.length > 0) {
+        for (let i = 0; i < value.length; i += 50) {
+          const chunk = value.slice(i, i + 50).map(item => ({
+            record_id: String(item.id || Date.now() + Math.random()),
             data: item,
             created_at: item.date || item.createdAt || new Date().toISOString(),
-          });
-        });
-      }
-
-      // Delete items that exist in cloud but were deleted locally
-      const toDelete = [...existingIds].filter(rid => !localIds.has(rid));
-      if (toDelete.length > 0) {
-        await _supabase.from(table).delete().in("record_id", toDelete);
-      }
-
-      // Upsert all local items (insert or update by record_id)
-      if (toUpsert.length > 0) {
-        for (let i = 0; i < toUpsert.length; i += 50) {
-          const chunk = toUpsert.slice(i, i + 50);
-          const { error } = await _supabase.from(table).upsert(chunk, {
-            onConflict: "record_id",
-          });
-          if (error) {
-            // Fallback: delete all and reinsert if upsert fails (schema might not have unique constraint)
-            console.warn(`Upsert failed for ${table}, using replace:`, error.message);
-            await _supabase.from(table).delete().gte("id", 0);
-            for (let j = 0; j < toUpsert.length; j += 50) {
-              await _supabase.from(table).insert(toUpsert.slice(j, j + 50));
-            }
-            break;
-          }
+          }));
+          const { error: insErr } = await _supabase.from(table).insert(chunk);
+          if (insErr) console.warn(`dbSave insert ${table}:`, insErr.message);
         }
       }
     }
@@ -131,41 +102,6 @@ export async function dbSave(table, value) {
 }
 
 // ─── Full sync: merge cloud + local ─────────────────────────────────────────
-export async function dbMergeLoad(table) {
-  const key = KEY[table];
-  if (!_supabase) return local.get(key);
-  if (SINGLE_ROW.has(table)) return dbLoad(table);
-
-  try {
-    const cloudData = await dbLoad(table);
-    const localData = local.get(key);
-
-    if (!cloudData?.length && !localData?.length) return null;
-    if (!cloudData?.length) return localData;
-    if (!localData?.length) return cloudData;
-
-    // Merge: use record ID as key, prefer most recent
-    const merged = new Map();
-    // Cloud first
-    (cloudData || []).forEach(item => {
-      const id = String(item.id || "");
-      if (id) merged.set(id, item);
-    });
-    // Local overwrites cloud for items we have locally
-    (localData || []).forEach(item => {
-      const id = String(item.id || "");
-      if (id) merged.set(id, item);
-    });
-
-    const result = [...merged.values()];
-    local.set(key, result);
-    return result;
-  } catch (err) {
-    console.warn(`dbMergeLoad(${table}) failed:`, err.message);
-    return local.get(key);
-  }
-}
-
 // ─── Test connection ────────────────────────────────────────────────────────
 export async function testConnection() {
   if (!_supabase) return { ok: false, error: "Client not initialized", debug: getDebugInfo() };

@@ -9,7 +9,7 @@ import Icon from "./components/Icons";
 import useResponsive from "./hooks/useResponsive";
 import QRBox from "./components/QRBox";
 import ItemModal from "./components/ItemModal";
-import { supabase, dbLoad, dbSave, dbMergeLoad, isOnline, testConnection, getDebugInfo } from "./lib/supabase";
+import { supabase, dbLoad, dbSave, isOnline, testConnection, getDebugInfo } from "./lib/supabase";
 import useHaptics from "./hooks/useHaptics";
 import useRealtimeSync from "./hooks/useRealtimeSync";
 
@@ -91,13 +91,13 @@ export default function App() {
     async function loadData() {
       try {
         const [r, t, c, s, inv, sh, sl] = await Promise.all([
-          dbMergeLoad("orders").catch(() => null),
-          dbMergeLoad("templates").catch(() => null),
-          dbMergeLoad("items").catch(() => null),
+          dbLoad("orders").catch(() => null),
+          dbLoad("templates").catch(() => null),
+          dbLoad("items").catch(() => null),
           dbLoad("settings").catch(() => null),
           dbLoad("inventory").catch(() => null),
-          dbMergeLoad("shows").catch(() => null),
-          dbMergeLoad("sellers").catch(() => null),
+          dbLoad("shows").catch(() => null),
+          dbLoad("sellers").catch(() => null),
         ]);
 
         const records_  = r && r.length ? r : store.get("km-builds");
