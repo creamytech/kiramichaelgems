@@ -14,6 +14,52 @@ import useHaptics from "./hooks/useHaptics";
 import useRealtimeSync from "./hooks/useRealtimeSync";
 
 const UNITS = ["each","per inch","per gram","per foot"];
+const todayISO = () => new Date().toISOString().slice(0,10);
+
+function LocationInput({ id, style }) {
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [open, setOpen] = useState(false);
+  const timerRef = useRef(null);
+  const wrapRef = useRef(null);
+
+  useEffect(() => {
+    function handleClick(e) { if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false); }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  function handleChange(val) {
+    setQuery(val);
+    if (timerRef.current) clearTimeout(timerRef.current);
+    if (!val.trim() || val.trim().length < 3) { setResults([]); setOpen(false); return; }
+    timerRef.current = setTimeout(async () => {
+      setLoading(true); setOpen(true);
+      try {
+        const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(val)}&format=json&countrycodes=us&limit=5`);
+        const data = await res.json();
+        setResults(data.map(d => d.display_name));
+      } catch { setResults([]); }
+      setLoading(false);
+    }, 300);
+  }
+
+  return (
+    <div ref={wrapRef} style={{position:"relative"}}>
+      <input id={id} placeholder="Location" value={query} onChange={e=>handleChange(e.target.value)} style={style} autoComplete="off"/>
+      {open && (
+        <div style={{position:"absolute",top:"100%",left:0,right:0,zIndex:99,background:"#fff",border:`1px solid ${T.border}`,borderRadius:8,marginTop:2,boxShadow:T.shadow,maxHeight:180,overflowY:"auto"}}>
+          {loading && <div style={{padding:"8px 12px",fontSize:13,color:T.dim}}>Searching...</div>}
+          {!loading && results.length===0 && query.trim().length>=3 && <div style={{padding:"8px 12px",fontSize:13,color:T.dim}}>No results</div>}
+          {results.map((r,i) => (
+            <button key={i} type="button" onClick={()=>{setQuery(r);setOpen(false);setResults([]);}} style={{display:"block",width:"100%",textAlign:"left",padding:"8px 12px",fontSize:13,color:T.text,background:"transparent",border:"none",borderBottom:`1px solid ${T.border}`,cursor:"pointer",fontFamily:"Georgia,serif"}}>{r}</button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function App() {
   const R = useResponsive();
@@ -1209,13 +1255,14 @@ export default function App() {
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
             <input id="gate-show-name" placeholder="Show name (e.g. Cape Coral Art Fest)" style={inputSt({fontSize:16})} autoFocus/>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-              <input id="gate-show-loc" placeholder="Location" style={inputSt()}/>
-              <input id="gate-show-date" placeholder={todayStr()} style={inputSt()}/>
+              <LocationInput id="gate-show-loc" style={inputSt()}/>
+              <input id="gate-show-date" type="date" defaultValue={todayISO()} style={inputSt()}/>
             </div>
             <button className="km-btn-press" onClick={()=>{
               const n=document.getElementById("gate-show-name")?.value;
               const l=document.getElementById("gate-show-loc")?.value||"";
-              const d=document.getElementById("gate-show-date")?.value||todayStr();
+              const dRaw=document.getElementById("gate-show-date")?.value;
+              const d=dRaw?new Date(dRaw+"T00:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}):todayStr();
               if(n?.trim()) createShow(n,l,d);
             }} style={{...btnPrimary({width:"100%",padding:"14px",fontSize:16})}}>
               Start Selling
@@ -1284,7 +1331,7 @@ export default function App() {
               display:"flex",alignItems:"center",gap:4,flexShrink:0,
               fontSize:12,fontWeight:600,color:T.accent,fontFamily:"Georgia,serif",whiteSpace:"nowrap",
             }}>
-              <span style={{fontSize:15}}>{activeSellerData.emoji}</span>
+              <Icon name={activeSellerData.emoji||"Diamond2"} size={15} color={T.accent}/>
               {activeSellerData.name}
             </button>
           )}
@@ -2431,7 +2478,7 @@ export default function App() {
                       <div style={{width:36,height:36,borderRadius:"50%",background:i===0&&s.orders>0?T.goldGradient:T.border,
                         color:i===0&&s.orders>0?"#fff":T.dim,display:"flex",alignItems:"center",justifyContent:"center",
                         fontSize:16,fontWeight:700,flexShrink:0}}>
-                        {s.emoji||s.name.charAt(0)}
+                        <Icon name={s.emoji||"Diamond2"} size={18} color={i===0&&s.orders>0?"#fff":T.dim}/>
                       </div>
                       <div>
                         <div style={{fontSize:15,fontWeight:700,color:T.text}}>
@@ -2995,13 +3042,14 @@ export default function App() {
               <div style={{display:"flex",flexDirection:"column",gap:8}}>
                 <input id="new-show-name" placeholder="Show name (e.g. Cape Coral Art Fest)" style={inputSt({fontSize:15})}/>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-                  <input id="new-show-location" placeholder="Location" style={inputSt()}/>
-                  <input id="new-show-date" placeholder={todayStr()} style={inputSt()}/>
+                  <LocationInput id="new-show-location" style={inputSt()}/>
+                  <input id="new-show-date" type="date" defaultValue={todayISO()} style={inputSt()}/>
                 </div>
                 <button className="km-btn-press" onClick={()=>{
                   const n=document.getElementById("new-show-name")?.value;
                   const l=document.getElementById("new-show-location")?.value||"";
-                  const d=document.getElementById("new-show-date")?.value||todayStr();
+                  const dRaw=document.getElementById("new-show-date")?.value;
+                  const d=dRaw?new Date(dRaw+"T00:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}):todayStr();
                   if(n?.trim()) createShow(n,l,d);
                 }} style={{...btnPrimary({width:"100%",padding:"12px",fontSize:15})}}>
                   Create Show
