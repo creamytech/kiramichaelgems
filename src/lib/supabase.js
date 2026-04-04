@@ -23,6 +23,7 @@ const local = {
 const KEY = {
   orders: "km-builds", templates: "km-templates", items: "km-custom",
   settings: "km-settings", inventory: "km-inventory", shows: "km-shows",
+  sellers: "km-sellers",
 };
 
 const SINGLE_ROW = new Set(["settings", "inventory"]);

@@ -21,6 +21,9 @@ export default function App() {
   const [shows,      setShows]      = useState([]);     // all shows/events
   const [activeShow, setActiveShow] = useState(null);   // current show id
   const [showPicker, setShowPicker] = useState(false);   // show picker modal
+  const [sellers,    setSellers]    = useState([]);     // seller profiles
+  const [activeSeller,setActiveSeller]=useState(null);  // current seller id
+  const [sellerPicker,setSellerPicker]=useState(true);  // show on startup
 
   const [loading,     setLoading]     = useState(true);
   const [tab,         setTab]         = useState("catalog");
@@ -58,13 +61,14 @@ export default function App() {
 
     async function loadData() {
       try {
-        const [r, t, c, s, inv, sh] = await Promise.all([
+        const [r, t, c, s, inv, sh, sl] = await Promise.all([
           dbLoad("orders").catch(() => null),
           dbLoad("templates").catch(() => null),
           dbLoad("items").catch(() => null),
           dbLoad("settings").catch(() => null),
           dbLoad("inventory").catch(() => null),
           dbLoad("shows").catch(() => null),
+          dbLoad("sellers").catch(() => null),
         ]);
 
         const records_  = r && r.length ? r : store.get("km-builds");
@@ -81,10 +85,14 @@ export default function App() {
         if (inv_)       setInventory(inv_);
         else { setInventory({...INITIAL_STOCK}); dbSave("inventory", {...INITIAL_STOCK}).catch(()=>{}); }
         if (shows_ && shows_.length) setShows(shows_);
+        const sellers_ = sl && sl.length ? sl : store.get("km-sellers");
+        if (sellers_ && sellers_.length) setSellers(sellers_);
 
-        // Restore active show from localStorage
+        // Restore active show + seller from localStorage
         const lastShow = store.get("km-activeShow");
         if (lastShow) setActiveShow(lastShow);
+        const lastSeller = store.get("km-activeSeller");
+        if (lastSeller) { setActiveSeller(lastSeller); setSellerPicker(false); }
       } catch (err) {
         console.warn("Init failed, using localStorage:", err);
         const r = store.get("km-builds");    if (r) setRecords(r);
@@ -95,8 +103,11 @@ export default function App() {
         if (inv) setInventory(inv);
         else setInventory({...INITIAL_STOCK});
         const sh = store.get("km-shows"); if (sh) setShows(sh);
+        const sl2 = store.get("km-sellers"); if (sl2) setSellers(sl2);
         const lastShow = store.get("km-activeShow");
         if (lastShow) setActiveShow(lastShow);
+        const lastSeller = store.get("km-activeSeller");
+        if (lastSeller) { setActiveSeller(lastSeller); setSellerPicker(false); }
       }
     }
 
@@ -187,7 +198,7 @@ export default function App() {
     const mk = markup;
     const retail = lineCost * mk;
     const rec = {
-      id:Date.now(), date:todayStr(), showId:activeShow||null, showName:activeShowData?.name||null,
+      id:Date.now(), date:todayStr(), showId:activeShow||null, showName:activeShowData?.name||null, sellerId:activeSeller||null, sellerName:activeSellerData?.name||null,
       buildName:item.name, customer:name.trim(),
       email:email.trim(), phone:phone.trim(),
       markup:mk, labor:0, pieces:1, discount:0, discountType:"%",
@@ -218,7 +229,7 @@ export default function App() {
   function saveBuild() {
     if (!buildItems.length || !customerName.trim()) return;
     const rec = {
-      id:Date.now(), date:orderDate, showId:activeShow||null, showName:activeShowData?.name||null,
+      id:Date.now(), date:orderDate, showId:activeShow||null, showName:activeShowData?.name||null, sellerId:activeSeller||null, sellerName:activeSellerData?.name||null,
       buildName:buildName.trim()||"Custom Build",
       customer:customerName.trim(), email:customerEmail.trim(), phone:customerPhone.trim(),
       markup, labor, pieces, discount, discountType,
@@ -447,8 +458,30 @@ export default function App() {
     if (activeShow===id) { setActiveShow(null); store.set("km-activeShow",null); }
   }
   const activeShowData = shows.find(s=>s.id===activeShow);
-  // Orders for the active show
+  const activeSellerData = sellers.find(s=>s.id===activeSeller);
   const showRecords = activeShow ? records.filter(r=>r.showId===activeShow) : records;
+
+  // ── Seller management ───────────────────────────────────────────────────────
+  function saveSellers(s) { setSellers(s); store.set("km-sellers",s); dbSave("sellers",s); }
+  function createSeller(name, emoji) {
+    const s = { id:Date.now(), name:name.trim(), emoji:emoji||"💎" };
+    const u = [s,...sellers];
+    saveSellers(u);
+    setActiveSeller(s.id); store.set("km-activeSeller",s.id);
+    setSellerPicker(false);
+    showToast(`Welcome, ${s.name}!`);
+  }
+  function pickSeller(id) {
+    setActiveSeller(id); store.set("km-activeSeller",id);
+    setSellerPicker(false);
+    const s = sellers.find(x=>x.id===id);
+    if (s) showToast(`Hey ${s.name}! Let's sell.`);
+  }
+  function deleteSeller(id) {
+    if (!window.confirm("Delete this profile?")) return;
+    saveSellers(sellers.filter(s=>s.id!==id));
+    if (activeSeller===id) { setActiveSeller(null); store.set("km-activeSeller",null); setSellerPicker(true); }
+  }
 
   const displayRec = checkoutRec || records[0];
   const paypalLink = (amt,note) => settings.paypal ? `https://www.paypal.me/${settings.paypal}/${amt.toFixed(2)}` : null;
@@ -586,10 +619,20 @@ export default function App() {
       return { ...s, orders:sOrders.length, revenue:sRevenue, profit:sProfit, pieces:sPieces };
     }).sort((a,b)=>b.revenue-a.revenue);
 
+    // Per-seller breakdown
+    const sellerBreakdown = sellers.map(s => {
+      const sOrders = records.filter(r=>r.sellerId===s.id);
+      const sRevenue = sOrders.reduce((a,r)=>a+r.totalRetail,0);
+      const sProfit = sOrders.reduce((a,r)=>a+r.profit,0);
+      const sPieces = sOrders.reduce((a,r)=>a+(r.pieces||1),0);
+      const sAvg = sOrders.length>0?sRevenue/sOrders.length:0;
+      return { ...s, orders:sOrders.length, revenue:sRevenue, profit:sProfit, pieces:sPieces, avg:sAvg };
+    }).sort((a,b)=>b.revenue-a.revenue);
+
     return { totalRevenue, totalProfit, totalCOGS, totalLabor, totalPieces, totalTax, totalDiscount,
              collected, pending, paidOrders, pendingOrders, netProfit, roi,
-             invValue, invConsumed, invUsedPct, avgOrder, avgMargin, topSellers, dailyData, showBreakdown };
-  }, [records, inventory, ALL_ITEMS, shows]);
+             invValue, invConsumed, invUsedPct, avgOrder, avgMargin, topSellers, dailyData, showBreakdown, sellerBreakdown };
+  }, [records, inventory, ALL_ITEMS, shows, sellers]);
 
   const NAV_FULL = [
     {id:"catalog",  label:"Catalog",   icon:"Grid"},
@@ -651,6 +694,66 @@ export default function App() {
     </div>
   );
 
+  // ── Seller picker (shows before main app) ──────────────────────────────────
+  if (sellerPicker && !activeSeller) return (
+    <div style={{minHeight:"100vh",background:"linear-gradient(145deg, #FAFAFD 0%, #F3EAFA 40%, #EDE2F6 70%, #FAFAFD 100%)",
+      display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
+      fontFamily:"Georgia,'Times New Roman',serif",padding:24,
+    }}>
+      <img src="/IMG_7676.jpeg" alt="KM" style={{height:80,marginBottom:24}}/>
+      <div style={{fontSize:24,fontWeight:700,color:T.text,marginBottom:4}}>Who's selling today?</div>
+      <p style={{fontSize:14,color:T.dim,marginBottom:28}}>Pick your profile to track your sales</p>
+
+      <div style={{width:"100%",maxWidth:400,display:"flex",flexDirection:"column",gap:10}}>
+        {sellers.map(s=>(
+          <button key={s.id} onClick={()=>pickSeller(s.id)} className="km-btn-press" style={{
+            ...cardSt({padding:"18px 20px"}),width:"100%",cursor:"pointer",
+            display:"flex",alignItems:"center",gap:14,border:`1.5px solid ${T.border}`,
+            textAlign:"left",background:"#fff",
+          }}>
+            <div style={{width:46,height:46,borderRadius:"50%",background:T.goldGradient,color:"#fff",
+              display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0}}>
+              {s.emoji||s.name.charAt(0)}
+            </div>
+            <div>
+              <div style={{fontSize:17,fontWeight:700,color:T.text}}>{s.name}</div>
+              <div style={{fontSize:12,color:T.dim}}>
+                {records.filter(r=>r.sellerId===s.id).length} total sales
+              </div>
+            </div>
+          </button>
+        ))}
+      </div>
+
+      {/* Create new profile */}
+      <div style={{width:"100%",maxWidth:400,marginTop:20,padding:"20px",borderRadius:16,background:"#fff",border:`1px solid ${T.border}`,boxShadow:T.shadow}}>
+        <div style={{fontSize:14,fontWeight:700,color:T.sub,marginBottom:10}}>New Profile</div>
+        <div style={{display:"flex",gap:8}}>
+          <select id="sp-emoji" style={{...inputSt({width:60,padding:"10px 8px",fontSize:20,textAlign:"center"})}}>
+            {["💎","👑","✨","🌟","💜","🔮","💫","🦋","🌸","🎨"].map(e=><option key={e} value={e}>{e}</option>)}
+          </select>
+          <input id="sp-name" placeholder="Your name" style={{...inputSt({flex:1,fontSize:16})}}/>
+          <button className="km-btn-press" onClick={()=>{
+            const n=document.getElementById("sp-name")?.value;
+            const e=document.getElementById("sp-emoji")?.value;
+            if(n?.trim()) createSeller(n,e);
+          }} style={{...btnPrimary({padding:"10px 20px",fontSize:15,flexShrink:0})}}>
+            Go
+          </button>
+        </div>
+      </div>
+
+      {sellers.length>0 && (
+        <button onClick={()=>setSellerPicker(false)} style={{
+          background:"none",border:"none",cursor:"pointer",color:T.dim,fontSize:13,
+          marginTop:16,fontFamily:"Georgia,serif",padding:8,
+        }}>
+          Skip for now
+        </button>
+      )}
+    </div>
+  );
+
   return (
     <div style={{minHeight:"100vh",background:T.bg,fontFamily:"Georgia,'Times New Roman',serif",color:T.text,fontSize:15}}>
 
@@ -676,6 +779,16 @@ export default function App() {
               <Icon name="ChevronDown" size={12}/>
             </button>
           </div>
+          {activeSellerData && (
+            <button onClick={()=>{setActiveSeller(null);store.set("km-activeSeller",null);setSellerPicker(true);}} style={{
+              background:T.accentLight,border:`1px solid ${T.accent}30`,borderRadius:20,
+              padding:"4px 12px 4px 6px",cursor:"pointer",display:"flex",alignItems:"center",gap:6,
+              fontSize:12,fontWeight:600,color:T.accent,fontFamily:"Georgia,serif",marginLeft:R.isMobile?0:8,
+            }}>
+              <span style={{fontSize:16}}>{activeSellerData.emoji}</span>
+              {activeSellerData.name}
+            </button>
+          )}
           {isOnline() && !R.isMobile && <span style={{fontSize:10,color:T.green,marginLeft:4}}>&#9679; Synced</span>}
         </div>
         {!R.isMobile && (
@@ -1530,6 +1643,46 @@ export default function App() {
               <Icon name="Sparkle" size={40} color={T.border}/>
               <p style={{color:T.sub,fontSize:16,marginTop:12}}>Make your first sale to see analytics</p>
               <button onClick={()=>setTab("catalog")} className="km-btn-press" style={btnPrimary({marginTop:12})}>Start Selling</button>
+            </div>
+          )}
+
+          {/* Seller Leaderboard */}
+          {dashboard.sellerBreakdown.length>0 && (
+            <div style={cardSt({padding:"20px",marginBottom:16})}>
+              <div style={{fontWeight:700,fontSize:16,marginBottom:14}}>Seller Leaderboard</div>
+              <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                {dashboard.sellerBreakdown.map((s,i)=>(
+                  <div key={s.id} style={{
+                    padding:"14px 16px",borderRadius:12,
+                    background:i===0&&s.orders>0?T.accentLight:T.bg,
+                    border:`1px solid ${i===0&&s.orders>0?T.accent+"40":T.border}`,
+                    display:"flex",justifyContent:"space-between",alignItems:"center",
+                  }}>
+                    <div style={{display:"flex",alignItems:"center",gap:12}}>
+                      <div style={{width:36,height:36,borderRadius:"50%",background:i===0&&s.orders>0?T.goldGradient:T.border,
+                        color:i===0&&s.orders>0?"#fff":T.dim,display:"flex",alignItems:"center",justifyContent:"center",
+                        fontSize:16,fontWeight:700,flexShrink:0}}>
+                        {s.emoji||s.name.charAt(0)}
+                      </div>
+                      <div>
+                        <div style={{fontSize:15,fontWeight:700,color:T.text}}>
+                          {s.name}
+                          {i===0&&s.orders>0&&<span style={{marginLeft:6,fontSize:11,color:T.accent}}>Top Seller</span>}
+                        </div>
+                        <div style={{fontSize:12,color:T.dim,marginTop:1}}>
+                          {s.orders} sale{s.orders!==1?"s":""} &middot; {s.pieces} pc &middot; avg ${fmt(s.avg)}
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{textAlign:"right"}}>
+                      <div style={{fontSize:18,fontWeight:700,color:T.accent}}>${fmt(s.revenue)}</div>
+                      <div style={{fontSize:12,fontWeight:600,color:s.profit>=0?T.green:T.red}}>
+                        ${fmt(s.profit)} profit
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
