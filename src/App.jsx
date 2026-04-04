@@ -6,6 +6,7 @@ import Icon from "./components/Icons";
 import useResponsive from "./hooks/useResponsive";
 import QRBox from "./components/QRBox";
 import ItemModal from "./components/ItemModal";
+import { dbLoad, dbSave, isOnline } from "./lib/supabase";
 
 const UNITS = ["each","per inch","per gram","per foot"];
 
@@ -47,18 +48,34 @@ export default function App() {
   const [discountType,  setDiscountType]  = useState("%");
 
   useEffect(() => {
-    const r = store.get("km-builds");    if (r) setRecords(r);
-    const t = store.get("km-templates"); if (t) setTemplates(t);
-    const c = store.get("km-custom");    if (c) setCustomItems(c);
-    const s = store.get("km-settings");  if (s) setSettings(s);
-    const inv = store.get("km-inventory");
-    if (inv) setInventory(inv);
-    else { setInventory({...INITIAL_STOCK}); store.set("km-inventory",{...INITIAL_STOCK}); }
-    // Brief splash so data settles + feels polished
-    setTimeout(() => setLoading(false), 1200);
+    async function init() {
+      // Load from Supabase if available, fall back to localStorage
+      const r = await dbLoad("orders")    || store.get("km-builds");
+      const t = await dbLoad("templates") || store.get("km-templates");
+      const c = await dbLoad("items")     || store.get("km-custom");
+      const s = await dbLoad("settings")  || store.get("km-settings");
+      const inv = await dbLoad("inventory") || store.get("km-inventory");
+
+      if (r && r.length) setRecords(r);
+      if (t && t.length) setTemplates(t);
+      if (c && c.length) setCustomItems(c);
+      if (s && Object.keys(s).length) setSettings(prev => ({...prev, ...s}));
+      if (inv && Object.keys(inv).length) setInventory(inv);
+      else { setInventory({...INITIAL_STOCK}); dbSave("inventory", {...INITIAL_STOCK}); }
+
+      // Cache locally too
+      if (r) store.set("km-builds", r);
+      if (t) store.set("km-templates", t);
+      if (c) store.set("km-custom", c);
+      if (s) store.set("km-settings", s);
+      if (inv) store.set("km-inventory", inv);
+
+      setLoading(false);
+    }
+    init();
   }, []);
 
-  const saveSettings = s => { setSettings(s); store.set("km-settings",s); };
+  const saveSettings = s => { setSettings(s); store.set("km-settings",s); dbSave("settings",s); };
 
   const ALL_ITEMS = useMemo(() => [...DEFAULT_ITEMS, ...customItems], [customItems]);
 
@@ -153,7 +170,7 @@ export default function App() {
     updateInventory(inv);
 
     const updated = [rec,...records];
-    setRecords(updated); store.set("km-builds",updated);
+    setRecords(updated); store.set("km-builds",updated); dbSave("orders",updated);
     setFlash("saved"); setTimeout(()=>setFlash(""),2500);
     setCheckoutRec(rec);
     setBuildItems([]); setCustomerName(""); setCustomerEmail("");
@@ -169,7 +186,7 @@ export default function App() {
       markup, labor, discountType, notes:buildNotes.trim(), createdAt:todayStr(),
     };
     const updated = [t,...templates];
-    setTemplates(updated); store.set("km-templates",updated);
+    setTemplates(updated); store.set("km-templates",updated); dbSave("templates",updated);
     setTmplFlash(t.id); setTimeout(()=>setTmplFlash(""),2200);
   }
 
@@ -183,18 +200,18 @@ export default function App() {
 
   function markPaid(id) {
     const u = records.map(r=>r.id===id?{...r,paid:true}:r);
-    setRecords(u); store.set("km-builds",u);
+    setRecords(u); store.set("km-builds",u); dbSave("orders",u);
   }
 
   function deleteRecord(id) {
     const u = records.filter(r=>r.id!==id);
-    setRecords(u); store.set("km-builds",u);
+    setRecords(u); store.set("km-builds",u); dbSave("orders",u);
     if (checkoutRec?.id===id) setCheckoutRec(null);
   }
 
   function deleteTemplate(id) {
     const u = templates.filter(t=>t.id!==id);
-    setTemplates(u); store.set("km-templates",u);
+    setTemplates(u); store.set("km-templates",u); dbSave("templates",u);
   }
 
   function saveCustomItem(form, existingId=null) {
@@ -203,12 +220,12 @@ export default function App() {
     const stockQty = parseFloat(form.initialStock);
     if (existingId) {
       const u = customItems.map(i=>i.id===existingId?{...i,...form,price,unit,isCustom:true}:i);
-      setCustomItems(u); store.set("km-custom",u);
+      setCustomItems(u); store.set("km-custom",u); dbSave("items",u);
       if (!isNaN(stockQty) && stockQty >= 0) setStock(existingId, stockQty);
     } else {
       const newItem = {...form, price, unit, id:uid(), isCustom:true};
       const u = [...customItems, newItem];
-      setCustomItems(u); store.set("km-custom",u);
+      setCustomItems(u); store.set("km-custom",u); dbSave("items",u);
       if (!isNaN(stockQty) && stockQty >= 0) {
         const inv = {...inventory, [newItem.id]: stockQty};
         updateInventory(inv);
@@ -219,13 +236,13 @@ export default function App() {
 
   function deleteCustomItem(id) {
     const u = customItems.filter(i=>i.id!==id);
-    setCustomItems(u); store.set("km-custom",u);
+    setCustomItems(u); store.set("km-custom",u); dbSave("items",u);
     setBuildItems(p=>p.filter(b=>b.itemId!==id));
   }
 
   // ── Inventory helpers ─────────────────────────────────────────────────────
   function updateInventory(newInv) {
-    setInventory(newInv); store.set("km-inventory",newInv);
+    setInventory(newInv); store.set("km-inventory",newInv); dbSave("inventory",newInv);
   }
   function adjustStock(itemId, delta) {
     const inv = {...inventory, [itemId]: Math.max(0, (inventory[itemId]||0) + delta)};
@@ -391,7 +408,10 @@ export default function App() {
           <Icon name="Gem" size={24} color={T.gold}/>
           <div>
             <div style={{fontSize:R.isMobile?17:20,fontWeight:700,color:T.text,letterSpacing:0.3}}>Kiramichael Gems</div>
-            {!R.isMobile && <div style={{fontSize:11,color:T.dim,letterSpacing:1}}>Build Cost & Checkout Calculator</div>}
+            {!R.isMobile && <div style={{fontSize:11,color:T.dim,letterSpacing:1}}>
+              Build Cost & Checkout Calculator
+              {isOnline() && <span style={{marginLeft:8,fontSize:10,color:T.green}}>&#9679; Synced</span>}
+            </div>}
           </div>
         </div>
         {!R.isMobile && (
