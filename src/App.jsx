@@ -18,6 +18,9 @@ export default function App() {
   const [customItems,setCustomItems]= useState([]);
   const [settings,   setSettings]   = useState({paypal:"",venmo:"",cashapp:"",bizName:"Kiramichael Gems",taxRate:0,taxEnabled:false,priceRounding:"none",lowStockThreshold:5});
   const [inventory,  setInventory]  = useState({});
+  const [shows,      setShows]      = useState([]);     // all shows/events
+  const [activeShow, setActiveShow] = useState(null);   // current show id
+  const [showPicker, setShowPicker] = useState(false);   // show picker modal
 
   const [loading,     setLoading]     = useState(true);
   const [tab,         setTab]         = useState("catalog");
@@ -55,12 +58,13 @@ export default function App() {
 
     async function loadData() {
       try {
-        const [r, t, c, s, inv] = await Promise.all([
+        const [r, t, c, s, inv, sh] = await Promise.all([
           dbLoad("orders").catch(() => null),
           dbLoad("templates").catch(() => null),
           dbLoad("items").catch(() => null),
           dbLoad("settings").catch(() => null),
           dbLoad("inventory").catch(() => null),
+          dbLoad("shows").catch(() => null),
         ]);
 
         const records_  = r && r.length ? r : store.get("km-builds");
@@ -68,6 +72,7 @@ export default function App() {
         const items_    = c && c.length ? c : store.get("km-custom");
         const settings_ = s && Object.keys(s).length ? s : store.get("km-settings");
         const inv_      = inv && Object.keys(inv).length ? inv : store.get("km-inventory");
+        const shows_    = sh && sh.length ? sh : store.get("km-shows");
 
         if (records_)   setRecords(records_);
         if (templates_) setTemplates(templates_);
@@ -75,12 +80,11 @@ export default function App() {
         if (settings_)  setSettings(prev => ({...prev, ...settings_}));
         if (inv_)       setInventory(inv_);
         else { setInventory({...INITIAL_STOCK}); dbSave("inventory", {...INITIAL_STOCK}).catch(()=>{}); }
+        if (shows_ && shows_.length) setShows(shows_);
 
-        if (records_)   store.set("km-builds", records_);
-        if (templates_) store.set("km-templates", templates_);
-        if (items_)     store.set("km-custom", items_);
-        if (settings_)  store.set("km-settings", settings_);
-        if (inv_)       store.set("km-inventory", inv_);
+        // Restore active show from localStorage
+        const lastShow = store.get("km-activeShow");
+        if (lastShow) setActiveShow(lastShow);
       } catch (err) {
         console.warn("Init failed, using localStorage:", err);
         const r = store.get("km-builds");    if (r) setRecords(r);
@@ -90,6 +94,9 @@ export default function App() {
         const inv = store.get("km-inventory");
         if (inv) setInventory(inv);
         else setInventory({...INITIAL_STOCK});
+        const sh = store.get("km-shows"); if (sh) setShows(sh);
+        const lastShow = store.get("km-activeShow");
+        if (lastShow) setActiveShow(lastShow);
       }
     }
 
@@ -180,7 +187,7 @@ export default function App() {
     const mk = markup;
     const retail = lineCost * mk;
     const rec = {
-      id:Date.now(), date:todayStr(),
+      id:Date.now(), date:todayStr(), showId:activeShow||null, showName:activeShowData?.name||null,
       buildName:item.name, customer:name.trim(),
       email:email.trim(), phone:phone.trim(),
       markup:mk, labor:0, pieces:1, discount:0, discountType:"%",
@@ -211,7 +218,7 @@ export default function App() {
   function saveBuild() {
     if (!buildItems.length || !customerName.trim()) return;
     const rec = {
-      id:Date.now(), date:orderDate,
+      id:Date.now(), date:orderDate, showId:activeShow||null, showName:activeShowData?.name||null,
       buildName:buildName.trim()||"Custom Build",
       customer:customerName.trim(), email:customerEmail.trim(), phone:customerPhone.trim(),
       markup, labor, pieces, discount, discountType,
@@ -418,6 +425,31 @@ export default function App() {
     return stock <= threshold;
   }
 
+  // ── Show / Event management ─────────────────────────────────────────────────
+  function saveShows(s) { setShows(s); store.set("km-shows",s); dbSave("shows",s); }
+  function createShow(name, location, date) {
+    const s = { id:Date.now(), name:name.trim(), location:location.trim(), date:date||todayStr(), createdAt:todayStr() };
+    const u = [s,...shows];
+    saveShows(u);
+    setActiveShow(s.id); store.set("km-activeShow",s.id);
+    setShowPicker(false);
+    showToast(`"${s.name}" — let's sell!`);
+  }
+  function selectShow(id) {
+    setActiveShow(id); store.set("km-activeShow",id);
+    setShowPicker(false);
+    const s = shows.find(sh=>sh.id===id);
+    if (s) showToast(`Switched to "${s.name}"`);
+  }
+  function deleteShow(id) {
+    if (!window.confirm("Delete this show? Orders tagged with it will keep their tag.")) return;
+    saveShows(shows.filter(s=>s.id!==id));
+    if (activeShow===id) { setActiveShow(null); store.set("km-activeShow",null); }
+  }
+  const activeShowData = shows.find(s=>s.id===activeShow);
+  // Orders for the active show
+  const showRecords = activeShow ? records.filter(r=>r.showId===activeShow) : records;
+
   const displayRec = checkoutRec || records[0];
   const paypalLink = (amt,note) => settings.paypal ? `https://www.paypal.me/${settings.paypal}/${amt.toFixed(2)}` : null;
   const venmoLink  = (amt,note) => settings.venmo  ? `https://venmo.com/?txn=pay&audience=private&recipients=${settings.venmo}&amount=${amt.toFixed(2)}&note=${encodeURIComponent(note)}` : null;
@@ -545,10 +577,19 @@ export default function App() {
     });
     const dailyData = Object.values(byDate).reverse();
 
+    // Per-show breakdown
+    const showBreakdown = shows.map(s => {
+      const sOrders = records.filter(r=>r.showId===s.id);
+      const sRevenue = sOrders.reduce((a,r)=>a+r.totalRetail,0);
+      const sProfit = sOrders.reduce((a,r)=>a+r.profit,0);
+      const sPieces = sOrders.reduce((a,r)=>a+(r.pieces||1),0);
+      return { ...s, orders:sOrders.length, revenue:sRevenue, profit:sProfit, pieces:sPieces };
+    }).sort((a,b)=>b.revenue-a.revenue);
+
     return { totalRevenue, totalProfit, totalCOGS, totalLabor, totalPieces, totalTax, totalDiscount,
              collected, pending, paidOrders, pendingOrders, netProfit, roi,
-             invValue, invConsumed, invUsedPct, avgOrder, avgMargin, topSellers, dailyData };
-  }, [records, inventory, ALL_ITEMS]);
+             invValue, invConsumed, invUsedPct, avgOrder, avgMargin, topSellers, dailyData, showBreakdown };
+  }, [records, inventory, ALL_ITEMS, shows]);
 
   const NAV_FULL = [
     {id:"catalog",  label:"Catalog",   icon:"Grid"},
@@ -622,15 +663,20 @@ export default function App() {
         position:"sticky", top:0, zIndex:100,
         backdropFilter:"blur(12px)", WebkitBackdropFilter:"blur(12px)",
       }}>
-        <div style={{display:"flex",alignItems:"center",gap:12}}>
-          <img src="/IMG_7676.jpeg" alt="KM" style={{height:R.isMobile?44:50,width:"auto",objectFit:"contain"}}/>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <img src="/IMG_7676.jpeg" alt="KM" style={{height:R.isMobile?40:46,width:"auto",objectFit:"contain"}}/>
           <div>
-            <div style={{fontSize:R.isMobile?15:17,fontWeight:700,color:T.text,letterSpacing:0.3}}>Kira-Michael Gems</div>
-            {!R.isMobile && <div style={{fontSize:11,color:T.dim,letterSpacing:0.8}}>
-              Build &middot; Price &middot; Sell
-              {isOnline() && <span style={{marginLeft:8,fontSize:10,color:T.green}}>&#9679; Synced</span>}
-            </div>}
+            <div style={{fontSize:R.isMobile?14:16,fontWeight:700,color:T.text,letterSpacing:0.3}}>Kira-Michael Gems</div>
+            <button onClick={()=>setShowPicker(true)} style={{
+              background:"none",border:"none",cursor:"pointer",padding:0,
+              fontSize:12,color:activeShowData?T.accent:T.dim,fontWeight:600,fontFamily:"Georgia,serif",
+              display:"flex",alignItems:"center",gap:4,marginTop:1,
+            }}>
+              {activeShowData ? <><span style={{width:6,height:6,borderRadius:"50%",background:T.green,flexShrink:0}}/>{activeShowData.name}</> : "No show selected — tap to pick"}
+              <Icon name="ChevronDown" size={12}/>
+            </button>
           </div>
+          {isOnline() && !R.isMobile && <span style={{fontSize:10,color:T.green,marginLeft:4}}>&#9679; Synced</span>}
         </div>
         {!R.isMobile && (
           <nav style={{display:"flex",gap:4,background:T.bg,borderRadius:12,padding:4,border:`1px solid ${T.border}`}}>
@@ -1487,10 +1533,40 @@ export default function App() {
             </div>
           )}
 
-          {/* View all orders link (especially for mobile where Records tab is hidden) */}
+          {/* Show Performance */}
+          {dashboard.showBreakdown.length>0 && (
+            <div style={cardSt({padding:"20px",marginBottom:16})}>
+              <div style={{fontWeight:700,fontSize:16,marginBottom:14}}>Show Performance</div>
+              <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                {dashboard.showBreakdown.map(s=>(
+                  <div key={s.id} className="km-card-hover" onClick={()=>{selectShow(s.id);setTab("records");}} style={{
+                    padding:"14px 16px",borderRadius:12,cursor:"pointer",
+                    background:activeShow===s.id?T.accentLight:T.bg,
+                    border:`1px solid ${activeShow===s.id?T.accent+"40":T.border}`,
+                    display:"flex",justifyContent:"space-between",alignItems:"center",
+                  }}>
+                    <div>
+                      <div style={{fontSize:14,fontWeight:700,color:T.text}}>{s.name}</div>
+                      <div style={{fontSize:12,color:T.dim,marginTop:2}}>
+                        {s.location && `${s.location} · `}{s.date} · {s.orders} sale{s.orders!==1?"s":""} · {s.pieces} pc
+                      </div>
+                    </div>
+                    <div style={{textAlign:"right"}}>
+                      <div style={{fontSize:16,fontWeight:700,color:T.accent}}>${fmt(s.revenue)}</div>
+                      <div style={{fontSize:12,fontWeight:600,color:s.profit>=0?T.green:T.red}}>
+                        {s.profit>=0?"+":""}${fmt(s.profit)} profit
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* View all orders link */}
           {records.length>0 && (
             <button onClick={()=>setTab("records")} className="km-btn-press" style={{
-              ...btnGhost(false,{width:"100%",marginTop:16,padding:"14px",fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",gap:8}),
+              ...btnGhost(false,{width:"100%",marginTop:8,padding:"14px",fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",gap:8}),
             }}>
               <Icon name="List" size={16}/>View All {records.length} Orders
             </button>
@@ -1806,6 +1882,76 @@ export default function App() {
           onSave={(form)=>saveCustomItem(form, typeof itemModal==="object" ? itemModal.id : null)}
           onCancel={()=>setItemModal(null)}
         />
+      )}
+
+      {/* Show Picker modal */}
+      {showPicker && (
+        <div style={{position:"fixed",inset:0,zIndex:200,background:"rgba(0,0,0,0.55)",backdropFilter:"blur(4px)",WebkitBackdropFilter:"blur(4px)",display:"flex",alignItems:"flex-end",justifyContent:"center",animation:"km-overlayIn 0.2s ease"}}
+          onClick={()=>setShowPicker(false)}>
+          <div style={{...cardSt(),width:"100%",maxWidth:480,borderBottomLeftRadius:0,borderBottomRightRadius:0,borderTopLeftRadius:20,borderTopRightRadius:20,padding:"24px 22px 36px",maxHeight:"85vh",overflowY:"auto",animation:"km-modalSlide 0.3s cubic-bezier(0.22,1,0.36,1)"}}
+            onClick={e=>e.stopPropagation()}>
+            <div style={{width:36,height:4,borderRadius:2,background:T.border,margin:"0 auto 16px"}}/>
+            <div style={{fontSize:18,fontWeight:700,color:T.text,marginBottom:4}}>Shows & Events</div>
+            <p style={{fontSize:13,color:T.sub,marginBottom:16}}>Pick a show to tag your sales. See how you did at each event.</p>
+
+            {/* New Show form */}
+            <div style={{padding:"14px",background:T.bg,borderRadius:12,border:`1px solid ${T.border}`,marginBottom:16}}>
+              <div style={{fontSize:13,fontWeight:700,color:T.sub,textTransform:"uppercase",letterSpacing:0.5,marginBottom:10}}>New Show</div>
+              <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                <input id="new-show-name" placeholder="Show name (e.g. Cape Coral Art Fest)" style={inputSt({fontSize:15})}/>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                  <input id="new-show-location" placeholder="Location" style={inputSt()}/>
+                  <input id="new-show-date" placeholder={todayStr()} style={inputSt()}/>
+                </div>
+                <button className="km-btn-press" onClick={()=>{
+                  const n=document.getElementById("new-show-name")?.value;
+                  const l=document.getElementById("new-show-location")?.value||"";
+                  const d=document.getElementById("new-show-date")?.value||todayStr();
+                  if(n?.trim()) createShow(n,l,d);
+                }} style={{...btnPrimary({width:"100%",padding:"12px",fontSize:15})}}>
+                  Create Show
+                </button>
+              </div>
+            </div>
+
+            {/* No show (general sales) */}
+            <button onClick={()=>{setActiveShow(null);store.set("km-activeShow",null);setShowPicker(false);showToast("Switched to general sales");}} className="km-btn-press"
+              style={{...btnGhost(!activeShow,{width:"100%",marginBottom:8,padding:"12px",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",gap:8})}}>
+              No show — general sales
+            </button>
+
+            {/* Existing shows */}
+            <div style={{display:"flex",flexDirection:"column",gap:6}}>
+              {shows.map(s=>{
+                const showOrders = records.filter(r=>r.showId===s.id);
+                const rev = showOrders.reduce((a,r)=>a+r.totalRetail,0);
+                const isActive = activeShow===s.id;
+                return (
+                  <div key={s.id} onClick={()=>selectShow(s.id)} style={{
+                    padding:"14px 16px",borderRadius:12,cursor:"pointer",
+                    background:isActive?T.accentLight:T.bg,
+                    border:`1.5px solid ${isActive?T.accent+"60":T.border}`,
+                    display:"flex",justifyContent:"space-between",alignItems:"center",
+                    transition:"all 0.2s ease",
+                  }}>
+                    <div>
+                      <div style={{fontSize:15,fontWeight:700,color:isActive?T.accent:T.text}}>{s.name}</div>
+                      <div style={{fontSize:12,color:T.dim,marginTop:2}}>
+                        {s.location && `${s.location} · `}{s.date} · {showOrders.length} order{showOrders.length!==1?"s":""}
+                      </div>
+                    </div>
+                    <div style={{display:"flex",alignItems:"center",gap:10}}>
+                      <div style={{fontSize:16,fontWeight:700,color:rev>0?T.green:T.dim}}>${fmt(rev)}</div>
+                      <button onClick={e=>{e.stopPropagation();deleteShow(s.id);}} style={{background:"none",border:"none",cursor:"pointer",color:T.dim,padding:4}}>
+                        <Icon name="Trash" size={14}/>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Quick Sell modal */}

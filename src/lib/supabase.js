@@ -1,9 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
 
-// ─── Supabase Config ────────────────────────────────────────────────────────
-// Set these in your .env file:
-//   VITE_SUPABASE_URL=https://your-project.supabase.co
-//   VITE_SUPABASE_ANON_KEY=your-anon-key
 const supabaseUrl  = import.meta.env.VITE_SUPABASE_URL  || "";
 const supabaseAnon = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
 
@@ -13,111 +9,80 @@ try {
     _supabase = createClient(supabaseUrl, supabaseAnon);
   }
 } catch (err) {
-  console.warn("Supabase client init failed:", err.message);
-  _supabase = null;
+  console.warn("Supabase init failed:", err.message);
 }
 export const supabase = _supabase;
+export const isOnline = () => !!_supabase;
 
-export const isOnline = () => !!supabase;
-
-// ─── DB helpers (fall back to localStorage when Supabase isn't configured) ──
-
-const localStore = {
-  get(k)    { try{const v=localStorage.getItem(k);return v?JSON.parse(v):null;}catch{return null;} },
-  set(k,v)  { try{localStorage.setItem(k,JSON.stringify(v));}catch{} },
+// ─── Local storage fallback ─────────────────────────────────────────────────
+const local = {
+  get(k) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : null; } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
 };
 
-// Table → localStorage key mapping
-const TABLE_KEY = {
-  orders:    "km-builds",
-  templates: "km-templates",
-  items:     "km-custom",
-  settings:  "km-settings",
-  inventory: "km-inventory",
+const KEY = {
+  orders: "km-builds", templates: "km-templates", items: "km-custom",
+  settings: "km-settings", inventory: "km-inventory", shows: "km-shows",
 };
 
-// ─── CRUD that works with or without Supabase ───────────────────────────────
+const SINGLE_ROW = new Set(["settings", "inventory"]);
 
+// ─── Load ───────────────────────────────────────────────────────────────────
 export async function dbLoad(table) {
-  const key = TABLE_KEY[table];
-  if (!supabase) return localStore.get(key);
+  const key = KEY[table];
+  if (!_supabase) return local.get(key);
 
   try {
-    let query = supabase.from(table).select("*");
-    // Only order by created_at on list tables
-    if (table !== "settings" && table !== "inventory") {
-      query = query.order("created_at", { ascending: false });
-    }
-    const { data, error } = await query;
+    let q = _supabase.from(table).select("*");
+    if (!SINGLE_ROW.has(table)) q = q.order("id", { ascending: false });
+    const { data, error } = await q;
     if (error) throw error;
-    if (!data || data.length === 0) return localStore.get(key);
+    if (!data || data.length === 0) return local.get(key);
 
-    // For single-row tables, return the data field
-    if (table === "settings" || table === "inventory") return data[0].data;
-    // For list tables, return array of data fields
-    return data.map(r => r.data);
+    if (SINGLE_ROW.has(table)) {
+      const result = data[0].data;
+      local.set(key, result); // cache locally
+      return result;
+    }
+    const result = data.map(r => r.data);
+    local.set(key, result);
+    return result;
   } catch (err) {
-    console.warn(`Supabase load failed for ${table}, falling back to local:`, err.message);
-    return localStore.get(key);
+    console.warn(`dbLoad(${table}) failed:`, err.message);
+    return local.get(key);
   }
 }
 
+// ─── Save ───────────────────────────────────────────────────────────────────
 export async function dbSave(table, value) {
-  const key = TABLE_KEY[table];
-  // Always save locally as cache
-  localStore.set(key, value);
+  const key = KEY[table];
+  local.set(key, value); // always cache locally first
 
-  if (!supabase) return;
+  if (!_supabase) return;
 
   try {
-    if (table === "settings" || table === "inventory") {
-      // Single-row tables: upsert by id=1
-      await supabase
+    if (SINGLE_ROW.has(table)) {
+      const { error } = await _supabase
         .from(table)
         .upsert({ id: 1, data: value, updated_at: new Date().toISOString() });
-    } else if (table === "orders" || table === "templates" || table === "items") {
-      // For array tables, we do a full replace (simple approach for small datasets)
-      // Delete all then re-insert
-      await supabase.from(table).delete().neq("id", 0); // delete all
+      if (error) throw error;
+    } else {
+      // Delete all then re-insert (simple & reliable for small datasets)
+      await _supabase.from(table).delete().gte("id", 0);
       if (Array.isArray(value) && value.length > 0) {
-        const rows = value.map((item, idx) => ({
-          id: idx + 1,
-          data: item,
-          record_id: item.id || idx,
-          created_at: item.date || item.createdAt || new Date().toISOString(),
-        }));
-        await supabase.from(table).insert(rows);
+        // Batch insert in chunks of 50 to avoid payload limits
+        for (let i = 0; i < value.length; i += 50) {
+          const chunk = value.slice(i, i + 50).map((item, idx) => ({
+            data: item,
+            record_id: String(item.id || (i + idx)),
+            created_at: item.date || item.createdAt || new Date().toISOString(),
+          }));
+          const { error } = await _supabase.from(table).insert(chunk);
+          if (error) throw error;
+        }
       }
     }
   } catch (err) {
-    console.warn(`Supabase save failed for ${table}:`, err.message);
+    console.warn(`dbSave(${table}) failed:`, err.message);
   }
-}
-
-// ─── Auth helpers ───────────────────────────────────────────────────────────
-
-export async function signIn(email, password) {
-  if (!supabase) return { error: { message: "Supabase not configured" } };
-  return supabase.auth.signInWithPassword({ email, password });
-}
-
-export async function signUp(email, password) {
-  if (!supabase) return { error: { message: "Supabase not configured" } };
-  return supabase.auth.signUp({ email, password });
-}
-
-export async function signOut() {
-  if (!supabase) return;
-  return supabase.auth.signOut();
-}
-
-export async function getSession() {
-  if (!supabase) return null;
-  const { data } = await supabase.auth.getSession();
-  return data?.session || null;
-}
-
-export function onAuthChange(callback) {
-  if (!supabase) return { data: { subscription: { unsubscribe: () => {} } } };
-  return supabase.auth.onAuthStateChange(callback);
 }

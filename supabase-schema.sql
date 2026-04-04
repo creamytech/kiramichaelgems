@@ -1,84 +1,85 @@
 -- ═══════════════════════════════════════════════════════════════════════════
--- Kiramichael Gems — Supabase Schema
--- Run this in your Supabase SQL Editor after creating the project
+-- Kiramichael Gems — Full Schema (drop & recreate)
+-- Run this in Supabase SQL Editor. It's safe to run multiple times.
 -- ═══════════════════════════════════════════════════════════════════════════
 
--- Orders table (saved builds/invoices)
-CREATE TABLE IF NOT EXISTS orders (
-  id          BIGINT PRIMARY KEY,
-  record_id   BIGINT,
+-- Drop existing tables if they exist (clean slate)
+DROP TABLE IF EXISTS orders CASCADE;
+DROP TABLE IF EXISTS templates CASCADE;
+DROP TABLE IF EXISTS items CASCADE;
+DROP TABLE IF EXISTS settings CASCADE;
+DROP TABLE IF EXISTS inventory CASCADE;
+DROP TABLE IF EXISTS shows CASCADE;
+
+-- ─── Shows / Events ─────────────────────────────────────────────────────────
+CREATE TABLE shows (
+  id          BIGSERIAL PRIMARY KEY,
   data        JSONB NOT NULL,
-  created_at  TIMESTAMPTZ DEFAULT now(),
-  user_id     UUID REFERENCES auth.users(id) DEFAULT auth.uid()
+  updated_at  TIMESTAMPTZ DEFAULT now()
 );
 
--- Templates table (saved build templates)
-CREATE TABLE IF NOT EXISTS templates (
-  id          BIGINT PRIMARY KEY,
-  record_id   BIGINT,
+-- ─── Orders ─────────────────────────────────────────────────────────────────
+CREATE TABLE orders (
+  id          BIGSERIAL PRIMARY KEY,
   data        JSONB NOT NULL,
-  created_at  TIMESTAMPTZ DEFAULT now(),
-  user_id     UUID REFERENCES auth.users(id) DEFAULT auth.uid()
+  record_id   TEXT,
+  created_at  TIMESTAMPTZ DEFAULT now()
 );
 
--- Custom items table (user-added catalog items)
-CREATE TABLE IF NOT EXISTS items (
-  id          BIGINT PRIMARY KEY,
-  record_id   BIGINT,
+-- ─── Templates ──────────────────────────────────────────────────────────────
+CREATE TABLE templates (
+  id          BIGSERIAL PRIMARY KEY,
   data        JSONB NOT NULL,
-  created_at  TIMESTAMPTZ DEFAULT now(),
-  user_id     UUID REFERENCES auth.users(id) DEFAULT auth.uid()
+  record_id   TEXT,
+  created_at  TIMESTAMPTZ DEFAULT now()
 );
 
--- Settings table (single row per user)
-CREATE TABLE IF NOT EXISTS settings (
-  id          BIGINT PRIMARY KEY DEFAULT 1,
+-- ─── Custom Items ───────────────────────────────────────────────────────────
+CREATE TABLE items (
+  id          BIGSERIAL PRIMARY KEY,
+  data        JSONB NOT NULL,
+  record_id   TEXT,
+  created_at  TIMESTAMPTZ DEFAULT now()
+);
+
+-- ─── Settings (single row) ──────────────────────────────────────────────────
+CREATE TABLE settings (
+  id          INT PRIMARY KEY DEFAULT 1,
   data        JSONB NOT NULL DEFAULT '{}',
-  updated_at  TIMESTAMPTZ DEFAULT now(),
-  user_id     UUID REFERENCES auth.users(id) DEFAULT auth.uid()
+  updated_at  TIMESTAMPTZ DEFAULT now()
 );
 
--- Inventory table (single row per user, stock levels as JSON)
-CREATE TABLE IF NOT EXISTS inventory (
-  id          BIGINT PRIMARY KEY DEFAULT 1,
+-- ─── Inventory (single row) ─────────────────────────────────────────────────
+CREATE TABLE inventory (
+  id          INT PRIMARY KEY DEFAULT 1,
   data        JSONB NOT NULL DEFAULT '{}',
-  updated_at  TIMESTAMPTZ DEFAULT now(),
-  user_id     UUID REFERENCES auth.users(id) DEFAULT auth.uid()
+  updated_at  TIMESTAMPTZ DEFAULT now()
 );
 
--- ─── Row Level Security ─────────────────────────────────────────────────────
--- Each user can only see and modify their own data
+-- ─── Enable RLS with public access ──────────────────────────────────────────
+-- (No auth required — all access via anon key)
 
+ALTER TABLE shows     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE orders    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE templates ENABLE ROW LEVEL SECURITY;
 ALTER TABLE items     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE settings  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE inventory ENABLE ROW LEVEL SECURITY;
 
--- Orders policies
-CREATE POLICY "Users see own orders"    ON orders    FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Users insert own orders" ON orders    FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users update own orders" ON orders    FOR UPDATE USING (auth.uid() = user_id);
-CREATE POLICY "Users delete own orders" ON orders    FOR DELETE USING (auth.uid() = user_id);
+-- Public access policies for all tables
+DO $$
+DECLARE
+  t TEXT;
+BEGIN
+  FOR t IN SELECT unnest(ARRAY['shows','orders','templates','items','settings','inventory'])
+  LOOP
+    EXECUTE format('CREATE POLICY "anon_select" ON %I FOR SELECT USING (true)', t);
+    EXECUTE format('CREATE POLICY "anon_insert" ON %I FOR INSERT WITH CHECK (true)', t);
+    EXECUTE format('CREATE POLICY "anon_update" ON %I FOR UPDATE USING (true)', t);
+    EXECUTE format('CREATE POLICY "anon_delete" ON %I FOR DELETE USING (true)', t);
+  END LOOP;
+END $$;
 
--- Templates policies
-CREATE POLICY "Users see own templates"    ON templates FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Users insert own templates" ON templates FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users update own templates" ON templates FOR UPDATE USING (auth.uid() = user_id);
-CREATE POLICY "Users delete own templates" ON templates FOR DELETE USING (auth.uid() = user_id);
-
--- Items policies
-CREATE POLICY "Users see own items"    ON items FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Users insert own items" ON items FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users update own items" ON items FOR UPDATE USING (auth.uid() = user_id);
-CREATE POLICY "Users delete own items" ON items FOR DELETE USING (auth.uid() = user_id);
-
--- Settings policies
-CREATE POLICY "Users see own settings"    ON settings FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Users insert own settings" ON settings FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users update own settings" ON settings FOR UPDATE USING (auth.uid() = user_id);
-
--- Inventory policies
-CREATE POLICY "Users see own inventory"    ON inventory FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Users insert own inventory" ON inventory FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users update own inventory" ON inventory FOR UPDATE USING (auth.uid() = user_id);
+-- Seed settings and inventory with empty row so upsert works
+INSERT INTO settings (id, data) VALUES (1, '{}') ON CONFLICT (id) DO NOTHING;
+INSERT INTO inventory (id, data) VALUES (1, '{}') ON CONFLICT (id) DO NOTHING;
