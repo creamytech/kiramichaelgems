@@ -233,6 +233,74 @@ export default function App() {
     setTemplates(u); store.set("km-templates",u); dbSave("templates",u);
   }
 
+  // ── Edit / Duplicate / Undo order ───────────────────────────────────────────
+  function editOrder(rec) {
+    // Load the order back into the build tab for editing
+    const items = rec.lines.map(l => {
+      const match = ALL_ITEMS.find(i => i.name === l.name && i.metal === l.metal);
+      return match ? { itemId: match.id, qty: l.qty } : null;
+    }).filter(Boolean);
+    setBuildItems(items);
+    setBuildName(rec.buildName);
+    setCustomerName(rec.customer);
+    setCustomerEmail(rec.email || "");
+    setOrderDate(rec.date);
+    setMarkup(rec.markup);
+    setLabor(rec.labor || 0);
+    setPieces(rec.pieces);
+    setDiscount(rec.discount || 0);
+    setDiscountType(rec.discountType || "%");
+    setBuildNotes(rec.notes || "");
+    // Remove the old record so saving creates an updated one
+    const u = records.filter(r => r.id !== rec.id);
+    setRecords(u); store.set("km-builds", u); dbSave("orders", u);
+    if (checkoutRec?.id === rec.id) setCheckoutRec(null);
+    // Restore inventory that was deducted for this order
+    const inv = { ...inventory };
+    rec.lines.forEach(l => {
+      const match = ALL_ITEMS.find(i => i.name === l.name && i.metal === l.metal);
+      if (match && inv[match.id] !== undefined) {
+        inv[match.id] += l.qty * (rec.pieces || 1);
+      }
+    });
+    updateInventory(inv);
+    setTab("build");
+  }
+
+  function duplicateOrder(rec) {
+    setBuildItems(rec.lines.map(l => {
+      const match = ALL_ITEMS.find(i => i.name === l.name && i.metal === l.metal);
+      return match ? { itemId: match.id, qty: l.qty } : null;
+    }).filter(Boolean));
+    setBuildName(rec.buildName + " (copy)");
+    setCustomerName("");
+    setCustomerEmail("");
+    setOrderDate(todayStr());
+    setMarkup(rec.markup);
+    setLabor(rec.labor || 0);
+    setPieces(rec.pieces);
+    setDiscount(rec.discount || 0);
+    setDiscountType(rec.discountType || "%");
+    setBuildNotes(rec.notes || "");
+    setTab("build");
+  }
+
+  function undoLastSale() {
+    if (!records.length) return;
+    const last = records[0];
+    if (!window.confirm(`Undo "${last.buildName}" for ${last.customer}? This will restore inventory and delete the order.`)) return;
+    // Restore inventory
+    const inv = { ...inventory };
+    last.lines.forEach(l => {
+      const match = ALL_ITEMS.find(i => i.name === l.name && i.metal === l.metal);
+      if (match && inv[match.id] !== undefined) {
+        inv[match.id] += l.qty * (last.pieces || 1);
+      }
+    });
+    updateInventory(inv);
+    deleteRecord(last.id);
+  }
+
   function saveCustomItem(form, existingId=null) {
     const price = form.unit==="per foot" ? parseFloat(form.price)/12 : parseFloat(form.price);
     const unit  = form.unit==="per foot" ? "per inch" : form.unit;
@@ -993,10 +1061,29 @@ export default function App() {
                   )}
 
                   {/* Email Invoice */}
-                  <button onClick={()=>emailInvoice(displayRec)} style={{
+                  <button onClick={()=>emailInvoice(displayRec)} className="km-btn-press" style={{
                     ...btnGhost(false,{width:"100%",marginTop:10,padding:"11px",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",gap:8}),
                   }}>
                     <Icon name="Save" size={16}/>Send Invoice via Email
+                  </button>
+
+                  {/* Edit / Duplicate / Delete */}
+                  <div style={{display:"flex",gap:8,marginTop:10}}>
+                    <button onClick={()=>editOrder(displayRec)} className="km-btn-press" style={{
+                      ...btnGhost(false,{flex:1,padding:"11px",fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",gap:6}),
+                    }}>
+                      <Icon name="Edit" size={14}/>Edit Order
+                    </button>
+                    <button onClick={()=>duplicateOrder(displayRec)} className="km-btn-press" style={{
+                      ...btnGhost(false,{flex:1,padding:"11px",fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",gap:6}),
+                    }}>
+                      <Icon name="Plus" size={14}/>Duplicate
+                    </button>
+                  </div>
+                  <button onClick={()=>{if(window.confirm(`Delete "${displayRec.buildName}"?`))deleteRecord(displayRec.id);}} className="km-btn-press" style={{
+                    ...btnGhost(false,{width:"100%",marginTop:6,padding:"11px",fontSize:13,borderColor:T.red+"60",color:T.red,display:"flex",alignItems:"center",justifyContent:"center",gap:6}),
+                  }}>
+                    <Icon name="Trash" size={14}/>Delete Order
                   </button>
                 </div>
 
@@ -1057,7 +1144,14 @@ export default function App() {
               <p style={{margin:0,color:T.sub,fontSize:14}}>{records.length} order{records.length!==1?"s":""} &middot; Saved on this device</p>
             </div>
             {records.length>0 && (
-              <button onClick={exportExcel} style={{...btnGhost(false,{borderColor:T.gold,color:T.gold,padding:"10px 18px",fontSize:14,display:"flex",alignItems:"center",gap:7})}}><Icon name="Save" size={15}/>Export Excel</button>
+              <div style={{display:"flex",gap:8}}>
+                <button onClick={undoLastSale} className="km-btn-press" style={{...btnGhost(false,{borderColor:T.red+"60",color:T.red,padding:"10px 14px",fontSize:14,display:"flex",alignItems:"center",gap:6})}}>
+                  <Icon name="X" size={14}/>Undo Last
+                </button>
+                <button onClick={exportExcel} className="km-btn-press" style={{...btnGhost(false,{borderColor:T.gold,color:T.gold,padding:"10px 18px",fontSize:14,display:"flex",alignItems:"center",gap:7})}}>
+                  <Icon name="Save" size={15}/>Export Excel
+                </button>
+              </div>
             )}
           </div>
 
@@ -1125,7 +1219,9 @@ export default function App() {
                         </div>
                       ))}
                       <span style={tagSt(r.paid?T.green:T.dim,r.paid?T.greenBg:"#F0EBE4")}>{r.paid?"Paid":"Pending"}</span>
-                      <button onClick={()=>{setCheckoutRec(r);setTab("checkout");}} style={{...btnGhost(false,{padding:"7px 12px",fontSize:13,display:"flex",alignItems:"center",gap:5})}}><Icon name="QR" size={14}/>Checkout</button>
+                      <button onClick={()=>{setCheckoutRec(r);setTab("checkout");}} className="km-btn-press" style={{...btnGhost(false,{padding:"7px 12px",fontSize:13,display:"flex",alignItems:"center",gap:5})}}><Icon name="QR" size={14}/>Checkout</button>
+                      <button onClick={()=>editOrder(r)} className="km-btn-press" style={{...btnGhost(false,{padding:"7px 12px",fontSize:13,display:"flex",alignItems:"center",gap:5})}}><Icon name="Edit" size={14}/>Edit</button>
+                      <button onClick={()=>duplicateOrder(r)} className="km-btn-press" style={{...btnGhost(false,{padding:"7px 12px",fontSize:13,display:"flex",alignItems:"center",gap:5})}}><Icon name="Plus" size={14}/>Copy</button>
                       <button onClick={()=>deleteRecord(r.id)} style={{background:"none",border:`1px solid ${T.border}`,borderRadius:6,color:T.dim,cursor:"pointer",padding:"7px 9px",display:"flex",alignItems:"center"}}>
                         <Icon name="Trash" size={14}/>
                       </button>
