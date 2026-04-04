@@ -613,7 +613,7 @@ export default function App() {
       <main style={{maxWidth:1200,margin:"0 auto",padding:mainPad,paddingBottom:mainPB,animation:"km-tabEnter 0.35s ease-out"}}>
 
         {/* ══════════════ CATALOG TAB ══════════════ */}
-        {tab==="catalog" && (<div style={{animation:"km-fadeIn 0.3s ease-out"}}>
+        {tab==="catalog" && (<div key={tab} className="km-tab-panel">
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:18,flexWrap:"wrap",gap:10}}>
             <div>
               <h2 style={{margin:0,fontSize:R.isMobile?21:26,fontWeight:700,letterSpacing:0.3}}>Item Catalog</h2>
@@ -623,31 +623,28 @@ export default function App() {
               <Icon name="Plus" size={16}/> Add Item
             </button>
           </div>
-          {/* Low stock alerts */}
+          {/* Low stock alerts — compact banner */}
           {(()=>{
             const lowItems = ALL_ITEMS.filter(i=>isLowStock(i.id));
             const outItems = lowItems.filter(i=>getStock(i.id)<=0);
             const warnItems = lowItems.filter(i=>getStock(i.id)>0);
             if (lowItems.length===0) return null;
             return (
-              <div style={{...cardSt({padding:"14px 18px",marginBottom:14,border:`1.5px solid ${outItems.length>0?T.red+"50":T.accent+"40"}`,background:outItems.length>0?"linear-gradient(135deg,#fff,#FDECEA)":"linear-gradient(135deg,#fff,#F3EAFA)"})}}>
-                <div style={{fontSize:14,fontWeight:700,color:outItems.length>0?T.red:T.accent,marginBottom:8}}>
-                  {outItems.length>0 && `${outItems.length} out of stock`}
+              <div style={{padding:"10px 16px",marginBottom:12,borderRadius:10,fontSize:13,
+                background:outItems.length>0?T.redBg:T.accentLight,
+                color:outItems.length>0?T.red:T.accent,
+                border:`1px solid ${outItems.length>0?T.red+"25":T.accent+"25"}`,
+                display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",
+              }}>
+                <span style={{fontWeight:700}}>
+                  {outItems.length>0 && `${outItems.length} out`}
                   {outItems.length>0 && warnItems.length>0 && " · "}
-                  {warnItems.length>0 && `${warnItems.length} running low`}
-                </div>
-                <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                  {lowItems.map(i=>(
-                    <span key={i.id} style={{
-                      fontSize:12,padding:"4px 10px",borderRadius:20,
-                      background:getStock(i.id)<=0?T.redBg:T.accentLight,
-                      color:getStock(i.id)<=0?T.red:T.accent,
-                      border:`1px solid ${getStock(i.id)<=0?T.red+"25":T.accent+"25"}`,
-                    }}>
-                      {i.name} &mdash; {getStock(i.id)<=0?"OUT":`${i.unit==="each"?getStock(i.id):fmt(getStock(i.id),1)}${i.unit==="per inch"?'"':i.unit==="per gram"?"g":""}`}
-                    </span>
-                  ))}
-                </div>
+                  {warnItems.length>0 && `${warnItems.length} low`}
+                </span>
+                <span style={{color:outItems.length>0?T.red+"99":T.accent+"99"}}>
+                  {lowItems.slice(0,5).map(i=>i.name.replace(/\(.*\)/,"").trim()).join(", ")}
+                  {lowItems.length>5 && ` +${lowItems.length-5} more`}
+                </span>
               </div>
             );
           })()}
@@ -668,7 +665,7 @@ export default function App() {
           </div>
           <div style={{display:"grid",gridTemplateColumns:`repeat(auto-fill,minmax(${R.isMobile?"160px":"260px"},1fr))`,gap:12}}>
             {catalogItems.map(item=>(
-              <div key={item.id} className="km-card-hover" style={{...cardSt({padding:"16px 18px"}),position:"relative",cursor:"default"}}
+              <div key={item.id} className="km-card-hover km-grid-item" style={{...cardSt({padding:"16px 18px"}),position:"relative",cursor:"default"}}
                 onMouseEnter={e=>{e.currentTarget.style.borderColor=T.borderAcc+"60";}}
                 onMouseLeave={e=>{e.currentTarget.style.borderColor=T.border;}}>
                 <div style={{position:"absolute",top:12,right:12,display:"flex",gap:3}}>
@@ -729,7 +726,7 @@ export default function App() {
         </div>)}
 
         {/* ══════════════ BUILD TAB ══════════════ */}
-        {tab==="build" && (<div style={{animation:"km-fadeIn 0.3s ease-out"}}>
+        {tab==="build" && (<div key={tab} className="km-tab-panel">
           <div style={{marginBottom:18}}>
             <h2 style={{margin:"0 0 3px",fontSize:R.isMobile?21:26,fontWeight:700,letterSpacing:0.3}}>New Order</h2>
             <p style={{margin:0,color:T.sub,fontSize:14}}>Build a piece, price it, and send to checkout</p>
@@ -987,7 +984,7 @@ export default function App() {
         </div>)}
 
         {/* ══════════════ CHECKOUT TAB ══════════════ */}
-        {tab==="checkout" && (<div style={{animation:"km-fadeIn 0.3s ease-out"}}>
+        {tab==="checkout" && (<div key={tab} className="km-tab-panel">
           <div style={{marginBottom:18}}>
             <h2 style={{margin:"0 0 3px",fontSize:R.isMobile?21:26,fontWeight:700,letterSpacing:0.3}}>Checkout</h2>
             <p style={{margin:0,color:T.sub,fontSize:14}}>Collect payment from your customer</p>
@@ -1226,7 +1223,7 @@ export default function App() {
         </div>)}
 
         {/* ══════════════ DASHBOARD TAB ══════════════ */}
-        {tab==="dashboard" && (<div style={{animation:"km-fadeIn 0.3s ease-out"}}>
+        {tab==="dashboard" && (<div key={tab} className="km-tab-panel">
           <div style={{marginBottom:16}}>
             <h2 style={{margin:"0 0 2px",fontSize:R.isMobile?20:24,fontWeight:700}}>Dashboard</h2>
             <p style={{margin:0,color:T.sub,fontSize:14}}>Real-time P&L from Invoice PI26-04970 &middot; Investment: ${fmt(INVOICE_TOTAL)}</p>
@@ -1403,7 +1400,7 @@ export default function App() {
         </div>)}
 
         {/* ══════════════ RECORDS TAB ══════════════ */}
-        {tab==="records" && (<div style={{animation:"km-fadeIn 0.3s ease-out"}}>
+        {tab==="records" && (<div key={tab} className="km-tab-panel">
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18,flexWrap:"wrap",gap:10}}>
             <div>
               <h2 style={{margin:"0 0 3px",fontSize:R.isMobile?21:26,fontWeight:700,letterSpacing:0.3}}>Order Records</h2>
@@ -1544,7 +1541,7 @@ export default function App() {
         </div>)}
 
         {/* ══════════════ SETTINGS TAB ══════════════ */}
-        {tab==="settings" && (<div style={{animation:"km-fadeIn 0.3s ease-out"}}>
+        {tab==="settings" && (<div key={tab} className="km-tab-panel">
           <div style={{marginBottom:18}}>
             <h2 style={{margin:"0 0 3px",fontSize:R.isMobile?21:26,fontWeight:700,letterSpacing:0.3}}>Settings</h2>
             <p style={{margin:0,color:T.sub,fontSize:14}}>Your payment handles and business details</p>
@@ -1692,11 +1689,11 @@ export default function App() {
               position:"relative",
               transition:"color 0.2s ease",
             }}>
-              <div style={{padding:2,borderRadius:8,background:tab===n.id?"rgba(168,135,42,0.08)":"transparent",transition:"background 0.2s ease"}}>
-                <Icon name={n.icon} size={22} color={tab===n.id?T.gold:T.dim}/>
+              <div style={{padding:4,borderRadius:10,background:tab===n.id?T.accentLight:"transparent",transition:"all 0.3s cubic-bezier(0.22,1,0.36,1)",transform:tab===n.id?"scale(1.1)":"scale(1)"}}>
+                <Icon name={n.icon} size={20} color={tab===n.id?T.accent:T.dim}/>
               </div>
-              <span style={{fontSize:10,fontWeight:tab===n.id?700:400,fontFamily:"sans-serif",letterSpacing:tab===n.id?0.3:0}}>{n.label}</span>
-              {tab===n.id && <div style={{position:"absolute",top:0,left:"50%",transform:"translateX(-50%)",width:16,height:2,borderRadius:1,background:T.goldGradient}}/>}
+              <span style={{fontSize:10,fontWeight:tab===n.id?700:400,fontFamily:"sans-serif",letterSpacing:tab===n.id?0.3:0,transition:"all 0.2s ease"}}>{n.label}</span>
+              {tab===n.id && <div style={{position:"absolute",top:0,left:"50%",transform:"translateX(-50%)",width:20,height:2.5,borderRadius:2,background:T.goldGradient,animation:"km-navDot 0.3s cubic-bezier(0.22,1,0.36,1)"}}/>}
               {n.badge>0 && <span style={{position:"absolute",top:5,right:"50%",transform:"translateX(13px)",background:n.id==="records"?T.green:T.goldGradient,color:"#fff",borderRadius:"50%",width:16,height:16,fontSize:9,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 1px 3px rgba(0,0,0,0.15)"}}>{n.badge}</span>}
             </button>
           ))}
@@ -1720,12 +1717,12 @@ export default function App() {
       {/* Toast notification */}
       {toast && (
         <div style={{
-          position:"fixed",top:R.isMobile?20:28,left:"50%",transform:"translateX(-50%)",zIndex:300,
+          position:"fixed",top:R.isMobile?20:28,left:"50%",zIndex:300,
           background:toast.type==="info"?T.text:T.accent,
           color:"#fff",padding:"12px 24px",borderRadius:12,
           fontSize:14,fontWeight:600,fontFamily:"Georgia,serif",
           boxShadow:T.shadowLg,
-          animation:"km-slideUp 0.3s cubic-bezier(0.4,0,0.2,1)",
+          animation:"km-toastIn 0.35s cubic-bezier(0.22,1,0.36,1) both",
           display:"flex",alignItems:"center",gap:8,
           maxWidth:"90vw",
         }}>
