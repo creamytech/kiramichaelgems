@@ -54,6 +54,11 @@ export const DEFAULT_ITEMS = [
 export const CATS = ["All","Chains","Clasps","Jump Rings","Charms","Rings","Beads","Other"];
 export const UNITS = ["each","per inch","per gram","per foot"];
 
+// Invoice PI26-04970 totals
+export const INVOICE_COST = 3246.89;   // Material subtotal
+export const INVOICE_FREIGHT = 62.08;  // Shipping
+export const INVOICE_TOTAL = 3308.97;  // Total investment
+
 // ─── INITIAL INVENTORY (JK Findings Invoice PI26-04970, shipped 03/24/26) ───
 // Chains: footage items converted to inches, pre-made chains = length * qty
 // per gram items stored in grams, everything else in "each"

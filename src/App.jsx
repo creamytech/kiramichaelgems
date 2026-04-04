@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import * as XLSX from "xlsx";
-import { DEFAULT_ITEMS, CATS, INITIAL_STOCK } from "./data/catalog";
+import { DEFAULT_ITEMS, CATS, INITIAL_STOCK, INVOICE_TOTAL, INVOICE_COST, INVOICE_FREIGHT } from "./data/catalog";
 import { T, fmt, todayStr, uid, store, cardSt, inputSt, labelSt, btnPrimary, btnGhost, tagSt } from "./theme";
 import Icon from "./components/Icons";
 import useResponsive from "./hooks/useResponsive";
@@ -419,10 +419,72 @@ export default function App() {
     XLSX.writeFile(wb,`KiramiGems_${new Date().toISOString().slice(0,10)}.xlsx`);
   }
 
+  // ── Dashboard analytics ────────────────────────────────────────────────────
+  const dashboard = useMemo(() => {
+    const totalRevenue  = records.reduce((s,r) => s + r.totalRetail, 0);
+    const totalProfit   = records.reduce((s,r) => s + r.profit, 0);
+    const totalCOGS     = records.reduce((s,r) => s + (r.materialCost||0) * (r.pieces||1), 0);
+    const totalLabor    = records.reduce((s,r) => s + (r.totalLabor||0), 0);
+    const totalPieces   = records.reduce((s,r) => s + (r.pieces||1), 0);
+    const totalTax      = records.reduce((s,r) => s + (r.taxAmt||0), 0);
+    const totalDiscount = records.reduce((s,r) => s + (r.discountAmt||0), 0);
+    const paidOrders    = records.filter(r => r.paid);
+    const pendingOrders = records.filter(r => !r.paid);
+    const collected     = paidOrders.reduce((s,r) => s + (r.totalWithTax||r.totalRetail), 0);
+    const pending       = pendingOrders.reduce((s,r) => s + (r.totalWithTax||r.totalRetail), 0);
+
+    // ROI based on invoice investment
+    const netProfit     = totalRevenue - INVOICE_TOTAL;
+    const roi           = INVOICE_TOTAL > 0 ? (netProfit / INVOICE_TOTAL) * 100 : 0;
+
+    // Inventory value remaining (current stock * unit price)
+    const invValue = ALL_ITEMS.reduce((s, item) => {
+      const stock = inventory[item.id] || 0;
+      return s + stock * item.price;
+    }, 0);
+
+    // Inventory consumed value
+    const invConsumed = INVOICE_COST - invValue;
+    const invUsedPct  = INVOICE_COST > 0 ? (invConsumed / INVOICE_COST) * 100 : 0;
+
+    // Average order value
+    const avgOrder = records.length > 0 ? totalRevenue / records.length : 0;
+    const avgMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
+
+    // Top sellers
+    const itemSales = {};
+    records.forEach(r => {
+      r.lines.forEach(l => {
+        const key = l.name;
+        if (!itemSales[key]) itemSales[key] = { name:l.name, metal:l.metal, revenue:0, qty:0, orders:0 };
+        itemSales[key].revenue += l.lineCost * (r.markup||2.5) * (r.pieces||1);
+        itemSales[key].qty += l.qty * (r.pieces||1);
+        itemSales[key].orders++;
+      });
+    });
+    const topSellers = Object.values(itemSales).sort((a,b) => b.revenue - a.revenue).slice(0, 8);
+
+    // Daily breakdown
+    const byDate = {};
+    records.forEach(r => {
+      if (!byDate[r.date]) byDate[r.date] = { date:r.date, revenue:0, profit:0, orders:0, pieces:0 };
+      byDate[r.date].revenue += r.totalRetail;
+      byDate[r.date].profit += r.profit;
+      byDate[r.date].orders++;
+      byDate[r.date].pieces += r.pieces||1;
+    });
+    const dailyData = Object.values(byDate).reverse();
+
+    return { totalRevenue, totalProfit, totalCOGS, totalLabor, totalPieces, totalTax, totalDiscount,
+             collected, pending, paidOrders, pendingOrders, netProfit, roi,
+             invValue, invConsumed, invUsedPct, avgOrder, avgMargin, topSellers, dailyData };
+  }, [records, inventory, ALL_ITEMS]);
+
   const NAV = [
     {id:"catalog",  label:"Catalog",   icon:"Grid"},
     {id:"build",    label:"Build",     icon:"Cart",   badge:buildItems.length||null},
     {id:"checkout", label:"Checkout",  icon:"QR"},
+    {id:"dashboard",label:"Dashboard", icon:"Sparkle"},
     {id:"records",  label:"Records",   icon:"List",   badge:records.length||null},
     {id:"settings", label:"Settings",  icon:"Gear"},
   ];
@@ -447,7 +509,7 @@ export default function App() {
         @keyframes km-glow { 0%,100%{filter:drop-shadow(0 0 0px rgba(139,47,201,0))} 50%{filter:drop-shadow(0 0 24px rgba(139,47,201,0.18))} }
       `}</style>
       <div style={{animation:"km-logoIn 0.8s cubic-bezier(0.4,0,0.2,1) both, km-glow 2.5s ease-in-out 0.8s infinite",marginBottom:28}}>
-        <img src="/logo.png" alt="Kira-Michael-Gems" style={{width:240,height:"auto"}}/>
+        <img src="/IMG_7676.jpeg" alt="Kira-Michael-Gems" style={{width:240,height:"auto"}}/>
       </div>
       <div style={{
         fontSize:13,color:T.dim,letterSpacing:3,textTransform:"uppercase",marginBottom:36,
@@ -489,7 +551,7 @@ export default function App() {
         backdropFilter:"blur(12px)", WebkitBackdropFilter:"blur(12px)",
       }}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
-          <img src="/logo.png" alt="KM" style={{height:R.isMobile?36:42,width:"auto"}}/>
+          <img src="/IMG_7676.jpeg" alt="KM" style={{height:R.isMobile?36:42,width:"auto"}}/>
           {!R.isMobile && <div style={{fontSize:11,color:T.dim,letterSpacing:1.2}}>
             Build Cost & Checkout Calculator
             {isOnline() && <span style={{marginLeft:8,fontSize:10,color:T.green}}>&#9679; Synced</span>}
@@ -1021,7 +1083,7 @@ export default function App() {
                     {qrMethod && PAY_METHODS.filter(m=>m.key===qrMethod&&m.link).map(m=>(
                       <div key={m.key} style={{textAlign:"center"}}>
                         <div style={{background:"#fff",borderRadius:20,padding:"24px 20px 18px",display:"inline-block",boxShadow:T.shadowLg,border:`1px solid ${T.border}`,marginBottom:14}}>
-                          <img src="/logo.png" alt="KM" style={{height:36,marginBottom:12}}/>
+                          <img src="/IMG_7676.jpeg" alt="KM" style={{height:36,marginBottom:12}}/>
                           <div style={{border:`3px solid ${m.bg}`,borderRadius:14,padding:12,display:"inline-block",background:"#fff"}}>
                             <QRBox url={m.link} size={R.isMobile?180:200}/>
                           </div>
@@ -1116,7 +1178,7 @@ export default function App() {
               {PAY_METHODS.filter(m=>m.key===qrMethod&&m.link).map(m=>(
                 <div key={m.key} style={{background:"#fff",borderRadius:24,padding:"32px 28px 28px",textAlign:"center",maxWidth:400,width:"100%",boxShadow:`0 0 80px ${m.bg}40, 0 0 200px rgba(139,47,201,0.1)`}}
                   onClick={e=>e.stopPropagation()}>
-                  <img src="/logo.png" alt="Kira-Michael-Gems" style={{height:48,marginBottom:16}}/>
+                  <img src="/IMG_7676.jpeg" alt="Kira-Michael-Gems" style={{height:48,marginBottom:16}}/>
                   <div style={{fontSize:18,fontWeight:700,color:T.text,marginBottom:2}}>{displayRec.buildName}</div>
                   <div style={{fontSize:15,color:T.sub,marginBottom:20}}>{displayRec.customer}</div>
                   <div style={{border:`3px solid ${m.bg}`,borderRadius:16,padding:12,display:"inline-block",marginBottom:16,background:"#fff"}}>
@@ -1131,6 +1193,183 @@ export default function App() {
                   </button>
                 </div>
               ))}
+            </div>
+          )}
+        </div>)}
+
+        {/* ══════════════ DASHBOARD TAB ══════════════ */}
+        {tab==="dashboard" && (<div style={{animation:"km-fadeIn 0.3s ease-out"}}>
+          <div style={{marginBottom:16}}>
+            <h2 style={{margin:"0 0 2px",fontSize:R.isMobile?20:24,fontWeight:700}}>Dashboard</h2>
+            <p style={{margin:0,color:T.sub,fontSize:14}}>Real-time P&L from Invoice PI26-04970 &middot; Investment: ${fmt(INVOICE_TOTAL)}</p>
+          </div>
+
+          {/* ROI Hero Card */}
+          <div style={{...cardSt({padding:"24px",marginBottom:16,border:`2px solid ${dashboard.netProfit>=0?T.green+"40":T.red+"40"}`,background:dashboard.netProfit>=0?"linear-gradient(135deg, #FFFFFF 0%, #EAF6EF 100%)":"linear-gradient(135deg, #FFFFFF 0%, #FDECEA 100%)"})}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:16}}>
+              <div>
+                <div style={{fontSize:12,fontWeight:700,color:T.sub,textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>Net Profit (Revenue − Investment)</div>
+                <div style={{fontSize:R.isMobile?28:36,fontWeight:700,color:dashboard.netProfit>=0?T.green:T.red}}>
+                  {dashboard.netProfit>=0?"+":""}${fmt(dashboard.netProfit)}
+                </div>
+              </div>
+              <div style={{textAlign:"right"}}>
+                <div style={{fontSize:12,fontWeight:700,color:T.sub,textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>ROI</div>
+                <div style={{fontSize:R.isMobile?24:32,fontWeight:700,color:dashboard.roi>=0?T.green:T.red}}>
+                  {dashboard.roi>=0?"+":""}{fmt(dashboard.roi,1)}%
+                </div>
+              </div>
+            </div>
+            {/* Progress bar: revenue vs investment */}
+            <div style={{marginTop:16}}>
+              <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:T.sub,marginBottom:4}}>
+                <span>Revenue: ${fmt(dashboard.totalRevenue)}</span>
+                <span>Goal: ${fmt(INVOICE_TOTAL)} (break even)</span>
+              </div>
+              <div style={{height:8,background:T.border,borderRadius:4,overflow:"hidden"}}>
+                <div style={{height:"100%",borderRadius:4,transition:"width 0.5s ease",
+                  width:`${Math.min(100,(dashboard.totalRevenue/INVOICE_TOTAL)*100)}%`,
+                  background:dashboard.totalRevenue>=INVOICE_TOTAL?`linear-gradient(90deg, ${T.green}, #4CAF50)`:`linear-gradient(90deg, ${T.accent}, ${T.accentMid})`,
+                }}/>
+              </div>
+            </div>
+          </div>
+
+          {/* Key Metrics Grid */}
+          <div style={{display:"grid",gridTemplateColumns:`repeat(${R.isMobile?2:4},1fr)`,gap:10,marginBottom:16}}>
+            {[
+              ["Revenue",      `$${fmt(dashboard.totalRevenue)}`,  T.accent],
+              ["Material Cost",`$${fmt(dashboard.totalCOGS)}`,     T.sub],
+              ["Gross Profit", `$${fmt(dashboard.totalProfit)}`,   T.green],
+              ["Avg Margin",   `${fmt(dashboard.avgMargin,1)}%`,   T.accent],
+              ["Orders",       dashboard.paidOrders.length+dashboard.pendingOrders.length, T.text],
+              ["Pieces Sold",  dashboard.totalPieces,              T.text],
+              ["Avg Order",    `$${fmt(dashboard.avgOrder)}`,      T.accent],
+              ["Labor Earned", `$${fmt(dashboard.totalLabor)}`,    T.sub],
+            ].map(([l,v,c])=>(
+              <div key={l} style={{...cardSt({padding:"14px 16px",textAlign:"center"})}}>
+                <div style={{fontSize:11,color:T.sub,marginBottom:4,textTransform:"uppercase",letterSpacing:0.5}}>{l}</div>
+                <div style={{fontSize:R.isMobile?16:20,fontWeight:700,color:c}}>{v}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Money Flow */}
+          <div style={{display:"grid",gridTemplateColumns:R.isMobile?"1fr":"1fr 1fr",gap:14,marginBottom:16}}>
+            {/* P&L Breakdown */}
+            <div style={cardSt({padding:"20px"})}>
+              <div style={{fontWeight:700,fontSize:16,marginBottom:14}}>Profit & Loss</div>
+              {[
+                ["Invoice Materials",  `-$${fmt(INVOICE_COST)}`,   T.red,   false],
+                ["Freight",            `-$${fmt(INVOICE_FREIGHT)}`, T.red,   false],
+                ["Total Investment",   `-$${fmt(INVOICE_TOTAL)}`,  T.red,   true],
+                ["divider"],
+                ["Revenue (sales)",    `+$${fmt(dashboard.totalRevenue)}`, T.green, false],
+                ...(dashboard.totalDiscount>0?[["Discounts Given",`-$${fmt(dashboard.totalDiscount)}`,T.red,false]]:[]),
+                ...(dashboard.totalTax>0?[["Tax Collected",`+$${fmt(dashboard.totalTax)}`,T.sub,false]]:[]),
+                ["divider"],
+                ["Net Profit/Loss",    `${dashboard.netProfit>=0?"+":""}$${fmt(dashboard.netProfit)}`, dashboard.netProfit>=0?T.green:T.red, true],
+              ].map((row,i)=>{
+                if (row[0]==="divider") return <div key={i} className="km-divider-shimmer" style={{margin:"8px 0"}}/>;
+                const [l,v,c,bold] = row;
+                return (
+                  <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:`1px solid ${T.border}`}}>
+                    <span style={{fontSize:13,color:bold?T.text:T.sub,fontWeight:bold?700:400}}>{l}</span>
+                    <span style={{fontSize:bold?16:14,fontWeight:bold?700:500,color:c}}>{v}</span>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Collections */}
+            <div style={cardSt({padding:"20px"})}>
+              <div style={{fontWeight:700,fontSize:16,marginBottom:14}}>Collections</div>
+              <div style={{display:"flex",flexDirection:"column",gap:12}}>
+                <div style={{padding:"16px",background:T.greenBg,borderRadius:12,border:`1px solid ${T.green}20`}}>
+                  <div style={{fontSize:11,fontWeight:700,color:T.green,textTransform:"uppercase",letterSpacing:0.5}}>Collected</div>
+                  <div style={{fontSize:24,fontWeight:700,color:T.green}}>${fmt(dashboard.collected)}</div>
+                  <div style={{fontSize:12,color:T.sub}}>{dashboard.paidOrders.length} paid order{dashboard.paidOrders.length!==1?"s":""}</div>
+                </div>
+                {dashboard.pending>0 && (
+                  <div style={{padding:"16px",background:"#FFF8E1",borderRadius:12,border:"1px solid #F0D06020"}}>
+                    <div style={{fontSize:11,fontWeight:700,color:"#B8860B",textTransform:"uppercase",letterSpacing:0.5}}>Pending</div>
+                    <div style={{fontSize:24,fontWeight:700,color:"#B8860B"}}>${fmt(dashboard.pending)}</div>
+                    <div style={{fontSize:12,color:T.sub}}>{dashboard.pendingOrders.length} unpaid order{dashboard.pendingOrders.length!==1?"s":""}</div>
+                  </div>
+                )}
+                {/* Inventory status */}
+                <div style={{padding:"16px",background:T.accentLight,borderRadius:12,border:`1px solid ${T.accent}20`}}>
+                  <div style={{fontSize:11,fontWeight:700,color:T.accent,textTransform:"uppercase",letterSpacing:0.5}}>Inventory Remaining</div>
+                  <div style={{fontSize:24,fontWeight:700,color:T.accent}}>${fmt(dashboard.invValue)}</div>
+                  <div style={{fontSize:12,color:T.sub}}>{fmt(dashboard.invUsedPct,1)}% of materials used</div>
+                  <div style={{height:6,background:T.border,borderRadius:3,overflow:"hidden",marginTop:8}}>
+                    <div style={{height:"100%",borderRadius:3,background:T.goldGradient,width:`${Math.min(100,dashboard.invUsedPct)}%`,transition:"width 0.5s"}}/>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Top Sellers */}
+          {dashboard.topSellers.length>0 && (
+            <div style={cardSt({padding:"20px",marginBottom:16})}>
+              <div style={{fontWeight:700,fontSize:16,marginBottom:14}}>Top Sellers</div>
+              <div style={{display:"grid",gridTemplateColumns:`repeat(auto-fill,minmax(${R.isMobile?"140px":"180px"},1fr))`,gap:8}}>
+                {dashboard.topSellers.map((item,i)=>(
+                  <div key={item.name} style={{padding:"12px",background:i===0?T.accentLight:T.bg,borderRadius:10,border:`1px solid ${i===0?T.accent+"30":T.border}`}}>
+                    <div style={{fontSize:12,fontWeight:700,color:i===0?T.accent:T.text,marginBottom:4}}>#{i+1}</div>
+                    <div style={{fontSize:13,color:T.text,lineHeight:1.3,marginBottom:6}}>{item.name}</div>
+                    <div style={{fontSize:11,color:T.dim}}>{item.metal} &middot; {item.orders} order{item.orders!==1?"s":""}</div>
+                    <div style={{fontSize:15,fontWeight:700,color:T.accent,marginTop:4}}>${fmt(item.revenue)}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Daily Breakdown */}
+          {dashboard.dailyData.length>0 && (
+            <div style={cardSt({padding:"20px"})}>
+              <div style={{fontWeight:700,fontSize:16,marginBottom:14}}>Sales by Day</div>
+              <div style={{overflowX:"auto"}}>
+                <table style={{width:"100%",borderCollapse:"collapse",minWidth:400}}>
+                  <thead>
+                    <tr style={{borderBottom:`2px solid ${T.border}`}}>
+                      {["Date","Orders","Pieces","Revenue","Profit"].map(h=>(
+                        <th key={h} style={{padding:"8px",textAlign:h==="Date"?"left":"right",fontSize:12,fontWeight:700,color:T.sub,textTransform:"uppercase",letterSpacing:0.5}}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {dashboard.dailyData.map(d=>(
+                      <tr key={d.date}>
+                        <td style={{padding:"10px 8px",fontSize:14,fontWeight:600,color:T.text}}>{d.date}</td>
+                        <td style={{padding:"10px 8px",fontSize:14,color:T.sub,textAlign:"right"}}>{d.orders}</td>
+                        <td style={{padding:"10px 8px",fontSize:14,color:T.sub,textAlign:"right"}}>{d.pieces}</td>
+                        <td style={{padding:"10px 8px",fontSize:14,fontWeight:600,color:T.accent,textAlign:"right"}}>${fmt(d.revenue)}</td>
+                        <td style={{padding:"10px 8px",fontSize:14,fontWeight:600,color:T.green,textAlign:"right"}}>${fmt(d.profit)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr style={{borderTop:`2px solid ${T.border}`}}>
+                      <td style={{padding:"10px 8px",fontSize:14,fontWeight:700}}>Total</td>
+                      <td style={{padding:"10px 8px",fontSize:14,fontWeight:600,textAlign:"right"}}>{records.length}</td>
+                      <td style={{padding:"10px 8px",fontSize:14,fontWeight:600,textAlign:"right"}}>{dashboard.totalPieces}</td>
+                      <td style={{padding:"10px 8px",fontSize:14,fontWeight:700,color:T.accent,textAlign:"right"}}>${fmt(dashboard.totalRevenue)}</td>
+                      <td style={{padding:"10px 8px",fontSize:14,fontWeight:700,color:T.green,textAlign:"right"}}>${fmt(dashboard.totalProfit)}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {records.length===0 && (
+            <div style={{...cardSt({padding:"48px 24px"}),textAlign:"center"}}>
+              <Icon name="Sparkle" size={40} color={T.border}/>
+              <p style={{color:T.sub,fontSize:16,marginTop:12}}>Make your first sale to see analytics</p>
+              <button onClick={()=>setTab("build")} style={btnPrimary({marginTop:12})}>Create an Order</button>
             </div>
           )}
         </div>)}
