@@ -92,15 +92,12 @@ export default function App() {
         const items_    = c && c.length ? c : store.get("km-custom");
         const settings_ = s && Object.keys(s).length ? s : store.get("km-settings");
         const inv_      = inv && Object.keys(inv).length ? inv : store.get("km-inventory");
-        const shows_    = sh && sh.length ? sh : store.get("km-shows");
-
         if (records_)   setRecords(records_);
         if (templates_) setTemplates(templates_);
         if (items_)     setCustomItems(items_);
         if (settings_)  setSettings(prev => ({...prev, ...settings_}));
         if (inv_ && Object.keys(inv_).length > 0) setInventory(inv_);
         else {
-          // No inventory anywhere — seed with invoice quantities and sync
           const seed = {...INITIAL_STOCK};
           setInventory(seed);
           store.set("km-inventory", seed);
