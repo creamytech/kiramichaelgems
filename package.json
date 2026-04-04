@@ -13,6 +13,7 @@
     "@supabase/supabase-js": "^2.104.0-canary.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
+    "web-haptics": "^0.0.6",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {

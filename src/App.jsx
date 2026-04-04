@@ -10,7 +10,7 @@ import useResponsive from "./hooks/useResponsive";
 import QRBox from "./components/QRBox";
 import ItemModal from "./components/ItemModal";
 import { dbLoad, dbSave, dbMergeLoad, isOnline, testConnection, getDebugInfo } from "./lib/supabase";
-import { haptic } from "./utils/haptic";
+import { haptic, hapticSuccess, hapticError, hapticHeavy, hapticSelect } from "./utils/haptic";
 
 const UNITS = ["each","per inch","per gram","per foot"];
 
@@ -196,12 +196,12 @@ export default function App() {
         if (itemModal) { setItemModal(null); return; }
         if (qrFull) { setQrFull(false); return; }
       }
-      if (e.key === "n" || e.key === "N") { setTab("build"); haptic(); return; }
-      if (e.key === "s" || e.key === "S") { saveBuild(); haptic(); return; }
+      if (e.key === "n" || e.key === "N") { setTab("build"); hapticSelect(); return; }
+      if (e.key === "s" || e.key === "S") { saveBuild(); hapticSuccess(); return; }
       const tabKeys = ["1","2","3","4","5"];
       const tabIds = ["catalog","build","checkout","dashboard","records"];
       const idx = tabKeys.indexOf(e.key);
-      if (idx >= 0) { setTab(tabIds[idx]); haptic(); }
+      if (idx >= 0) { setTab(tabIds[idx]); hapticSelect(); }
     }
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
@@ -285,7 +285,7 @@ export default function App() {
   function quickSellComplete(name, phone, email) {
     const item = quickSell;
     if (!item || !name.trim()) return;
-    haptic();
+    hapticSuccess();
     const qty = item.unit==="per inch"?18:1;
     const lineCost = item.price * qty;
     const mk = markup;
@@ -321,7 +321,7 @@ export default function App() {
 
   function saveBuild() {
     if (!buildItems.length || !customerName.trim()) return;
-    haptic();
+    hapticSuccess();
     const rec = {
       id:Date.now(), date:orderDate, showId:activeShow||null, showName:activeShowData?.name||null, sellerId:activeSeller||null, sellerName:activeSellerData?.name||null,
       buildName:buildName.trim()||"Custom Build",
@@ -375,7 +375,7 @@ export default function App() {
   }
 
   function markPaid(id) {
-    haptic();
+    hapticHeavy();
     const u = records.map(r=>r.id===id?{...r,paid:true}:r);
     setRecords(u); store.set("km-builds",u); dbSave("orders",u);
     if (checkoutRec?.id===id) setCheckoutRec({...checkoutRec, paid:true});
@@ -1242,7 +1242,7 @@ export default function App() {
         {!R.isMobile && (
           <nav style={{display:"flex",gap:4,background:T.bg,borderRadius:12,padding:4,border:`1px solid ${T.border}`}}>
             {NAV.map(n=>(
-              <button key={n.id} onClick={()=>{setTab(n.id);haptic();}} className="km-btn-press" style={{
+              <button key={n.id} onClick={()=>{setTab(n.id);hapticSelect();}} className="km-btn-press" style={{
                 background:tab===n.id?T.card:"transparent",
                 color:tab===n.id?T.gold:T.dim,
                 border:"none",
@@ -2901,7 +2901,7 @@ export default function App() {
           backdropFilter:"blur(12px)", WebkitBackdropFilter:"blur(12px)",
         }}>
           {NAV.map(n=>(
-            <button key={n.id} onClick={()=>{setTab(n.id);haptic();}} style={{
+            <button key={n.id} onClick={()=>{setTab(n.id);hapticSelect();}} style={{
               flex:1, display:"flex", flexDirection:"column", alignItems:"center",
               justifyContent:"center", gap:2, padding:"10px 0 8px",
               background:"none", border:"none", cursor:"pointer",

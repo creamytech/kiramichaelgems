@@ -1,5 +1,17 @@
-export function haptic(ms = 10) {
+import { WebHaptics } from "web-haptics";
+
+let wh = null;
+try {
+  wh = new WebHaptics();
+} catch {}
+
+export function haptic(pattern = "light") {
   try {
-    if (navigator.vibrate) navigator.vibrate(ms);
+    if (wh) wh.trigger(pattern);
   } catch {}
 }
+
+export function hapticSuccess() { haptic("success"); }
+export function hapticError()   { haptic("error"); }
+export function hapticHeavy()   { haptic("heavy"); }
+export function hapticSelect()  { haptic("selection"); }
