@@ -1203,30 +1203,32 @@ export default function App() {
         position:"sticky", top:0, zIndex:100,
         backdropFilter:"blur(12px)", WebkitBackdropFilter:"blur(12px)",
       }}>
-        <div style={{display:"flex",alignItems:"center",gap:10}}>
-          <img src="/IMG_7676.jpeg" alt="KM" style={{height:R.isMobile?40:46,width:"auto",objectFit:"contain"}}/>
-          <div>
-            <div style={{fontSize:R.isMobile?14:16,fontWeight:700,color:T.text,letterSpacing:0.3}}>KM Gems</div>
+        <div style={{display:"flex",alignItems:"center",gap:8,minWidth:0,flex:1}}>
+          <img src="/IMG_7676.jpeg" alt="KM" style={{height:R.isMobile?32:42,width:"auto",objectFit:"contain",flexShrink:0}}/>
+          <div style={{minWidth:0,flex:1}}>
+            <div style={{display:"flex",alignItems:"center",gap:6}}>
+              <span style={{fontSize:R.isMobile?14:16,fontWeight:700,color:T.text}}>KM Gems</span>
+              {activeSellerData && (
+                <button onClick={()=>{setActiveSeller(null);store.set("km-activeSeller",null);setSellerPicker(true);}} style={{
+                  background:T.accentLight,border:`1px solid ${T.accent}30`,borderRadius:14,
+                  padding:"2px 8px 2px 4px",cursor:"pointer",display:"flex",alignItems:"center",gap:3,
+                  fontSize:11,fontWeight:600,color:T.accent,fontFamily:"Georgia,serif",flexShrink:0,
+                }}>
+                  <span style={{fontSize:13}}>{activeSellerData.emoji}</span>
+                  {R.isMobile ? "" : activeSellerData.name}
+                </button>
+              )}
+            </div>
             <button onClick={()=>setShowPicker(true)} style={{
               background:"none",border:"none",cursor:"pointer",padding:0,
-              fontSize:12,color:activeShowData?T.accent:T.dim,fontWeight:600,fontFamily:"Georgia,serif",
-              display:"flex",alignItems:"center",gap:4,marginTop:1,
+              fontSize:11,color:activeShowData?T.accent:T.dim,fontWeight:600,fontFamily:"Georgia,serif",
+              display:"flex",alignItems:"center",gap:3,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",
             }}>
-              {activeShowData ? <><span style={{width:6,height:6,borderRadius:"50%",background:T.green,flexShrink:0}}/>{activeShowData.name}</> : "No show selected — tap to pick"}
-              <Icon name="ChevronDown" size={12}/>
+              {activeShowData ? <><span style={{width:5,height:5,borderRadius:"50%",background:T.green,flexShrink:0}}/>{activeShowData.name}</> : "Tap to pick show"}
+              <Icon name="ChevronDown" size={10}/>
             </button>
           </div>
-          {activeSellerData && (
-            <button onClick={()=>{setActiveSeller(null);store.set("km-activeSeller",null);setSellerPicker(true);}} style={{
-              background:T.accentLight,border:`1px solid ${T.accent}30`,borderRadius:20,
-              padding:"4px 12px 4px 6px",cursor:"pointer",display:"flex",alignItems:"center",gap:6,
-              fontSize:12,fontWeight:600,color:T.accent,fontFamily:"Georgia,serif",marginLeft:R.isMobile?0:8,
-            }}>
-              <span style={{fontSize:16}}>{activeSellerData.emoji}</span>
-              {activeSellerData.name}
-            </button>
-          )}
-          {isOnline() && !R.isMobile && <span style={{fontSize:10,color:T.green,marginLeft:4}}>&#9679; Synced</span>}
+          {isOnline() && !R.isMobile && <span style={{fontSize:10,color:T.green,flexShrink:0}}>&#9679;</span>}
         </div>
         {!R.isMobile && (
           <nav style={{display:"flex",gap:4,background:T.bg,borderRadius:12,padding:4,border:`1px solid ${T.border}`}}>
@@ -1388,23 +1390,23 @@ export default function App() {
 
         {/* ══════════════ BUILD TAB ══════════════ */}
         {tab==="build" && (<div key={tab} className="km-tab-panel">
-          <div style={{marginBottom:18}}>
-            <h2 style={{margin:"0 0 3px",fontSize:R.isMobile?21:26,fontWeight:700,letterSpacing:0.3}}>New Order</h2>
-            {/* Step indicator */}
-            <div style={{display:"flex",gap:4,marginTop:10}}>
+          <div style={{marginBottom:14}}>
+            <h2 style={{margin:"0 0 6px",fontSize:R.isMobile?19:24,fontWeight:700}}>New Order</h2>
+            {/* Step indicator — compact */}
+            <div style={{display:"flex",gap:3}}>
               {[
-                {n:1, label:"Add Items",    done:buildItems.length>0},
-                {n:2, label:"Customer",     done:customerName.trim().length>0},
-                {n:3, label:"Price & Save", done:false},
+                {n:1, label:"Items",     done:buildItems.length>0},
+                {n:2, label:"Customer",  done:customerName.trim().length>0},
+                {n:3, label:"Save",      done:false},
               ].map(s=>(
-                <div key={s.n} style={{flex:1,display:"flex",alignItems:"center",gap:6,padding:"8px 10px",borderRadius:8,
+                <div key={s.n} style={{flex:1,display:"flex",alignItems:"center",gap:4,padding:"6px 8px",borderRadius:6,
                   background:s.done?T.greenBg:T.bg,border:`1px solid ${s.done?T.green+"30":T.border}`,transition:"all 0.3s ease"}}>
-                  <div style={{width:22,height:22,borderRadius:"50%",fontSize:11,fontWeight:700,
+                  <div style={{width:18,height:18,borderRadius:"50%",fontSize:10,fontWeight:700,
                     background:s.done?T.green:T.border,color:s.done?"#fff":T.dim,
-                    display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all 0.3s ease"}}>
+                    display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
                     {s.done?"✓":s.n}
                   </div>
-                  <span style={{fontSize:12,fontWeight:600,color:s.done?T.green:T.dim}}>{s.label}</span>
+                  <span style={{fontSize:11,fontWeight:600,color:s.done?T.green:T.dim}}>{s.label}</span>
                 </div>
               ))}
             </div>
@@ -1453,7 +1455,7 @@ export default function App() {
               <div style={{display:"flex",gap:5,overflowX:"auto",paddingBottom:2,WebkitOverflowScrolling:"touch",marginTop:8}}>
                 {CATS.map(c=>(<button key={c} onClick={()=>setBuildCat(c)} className="km-btn-press" style={{...btnGhost(buildCat===c),padding:"5px 10px",fontSize:12,whiteSpace:"nowrap",flexShrink:0}}>{c}</button>))}
               </div>
-              <div style={{overflowY:"auto",maxHeight:R.isMobile?240:440,display:"flex",flexDirection:"column",gap:4,marginTop:8}}>
+              <div style={{overflowY:"auto",maxHeight:R.isMobile?180:440,display:"flex",flexDirection:"column",gap:4,marginTop:8}}>
                 {sidebarItems.map(item=>{
                   const inBuild = buildItems.find(b=>b.itemId===item.id);
                   return (
