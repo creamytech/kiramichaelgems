@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import * as XLSX from "xlsx";
-import { DEFAULT_ITEMS, CATS, INITIAL_STOCK, INVOICE_TOTAL, INVOICE_COST, INVOICE_FREIGHT } from "./data/catalog";
+import { DEFAULT_ITEMS, CATS, INITIAL_STOCK, INVOICE_TOTAL, INVOICE_COST, INVOICE_FREIGHT, INVOICE_GOLD_OZ, INVOICE_SILVER_OZ, INVOICE_14KGF_COST, INVOICE_925AG_COST } from "./data/catalog";
+import useMetalPrices from "./hooks/useMetalPrices";
 import { T, fmt, todayStr, uid, store, cardSt, inputSt, labelSt, btnPrimary, btnGhost, tagSt } from "./theme";
 import Icon from "./components/Icons";
 import useResponsive from "./hooks/useResponsive";
@@ -12,6 +13,7 @@ const UNITS = ["each","per inch","per gram","per foot"];
 
 export default function App() {
   const R = useResponsive();
+  const metals = useMetalPrices();
 
   const [records,    setRecords]    = useState([]);
   const [templates,  setTemplates]  = useState([]);
@@ -619,6 +621,15 @@ export default function App() {
       return { ...s, orders:sOrders.length, revenue:sRevenue, profit:sProfit, pieces:sPieces };
     }).sort((a,b)=>b.revenue-a.revenue);
 
+    // Gold/Silver price impact
+    const goldRatio = metals.gold ? metals.gold / INVOICE_GOLD_OZ : 1;
+    const silverRatio = metals.silver ? metals.silver / INVOICE_SILVER_OZ : 1;
+    const invoiceTodayGold = INVOICE_14KGF_COST * goldRatio;
+    const invoiceTodaySilver = INVOICE_925AG_COST * silverRatio;
+    const invoiceToday = invoiceTodayGold + invoiceTodaySilver + INVOICE_FREIGHT;
+    const metalGainLoss = invoiceToday - INVOICE_TOTAL;
+    const metalPctChange = ((invoiceToday / INVOICE_TOTAL) - 1) * 100;
+
     // Per-seller breakdown
     const sellerBreakdown = sellers.map(s => {
       const sOrders = records.filter(r=>r.sellerId===s.id);
@@ -631,8 +642,9 @@ export default function App() {
 
     return { totalRevenue, totalProfit, totalCOGS, totalLabor, totalPieces, totalTax, totalDiscount,
              collected, pending, paidOrders, pendingOrders, netProfit, roi,
-             invValue, invConsumed, invUsedPct, avgOrder, avgMargin, topSellers, dailyData, showBreakdown, sellerBreakdown };
-  }, [records, inventory, ALL_ITEMS, shows, sellers]);
+             invValue, invConsumed, invUsedPct, avgOrder, avgMargin, topSellers, dailyData, showBreakdown, sellerBreakdown,
+             goldRatio, silverRatio, invoiceToday, metalGainLoss, metalPctChange };
+  }, [records, inventory, ALL_ITEMS, shows, sellers, metals.gold, metals.silver]);
 
   const NAV_FULL = [
     {id:"catalog",  label:"Catalog",   icon:"Grid"},
@@ -1505,6 +1517,95 @@ export default function App() {
                   background:dashboard.totalRevenue>=INVOICE_TOTAL?`linear-gradient(90deg, ${T.green}, #4CAF50)`:`linear-gradient(90deg, ${T.accent}, ${T.accentMid})`,
                 }}/>
               </div>
+            </div>
+          </div>
+
+          {/* Live Metal Prices */}
+          <div style={{display:"grid",gridTemplateColumns:R.isMobile?"1fr":"1fr 1fr",gap:12,marginBottom:16}}>
+            {/* Gold price card */}
+            <div style={{...cardSt({padding:"18px 20px",border:`1.5px solid ${metals.gold?dashboard.metalGainLoss>=0?T.green+"40":T.red+"40":T.border}`})}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
+                <div>
+                  <div style={{fontSize:11,fontWeight:700,color:T.dim,textTransform:"uppercase",letterSpacing:0.5}}>Gold Spot</div>
+                  <div style={{fontSize:26,fontWeight:700,color:T.text,marginTop:2}}>
+                    {metals.gold ? `$${fmt(metals.gold)}` : metals.loading ? "Loading..." : "—"}
+                  </div>
+                  <div style={{fontSize:12,color:T.dim}}>per troy oz</div>
+                </div>
+                {metals.silver && (
+                  <div style={{textAlign:"right"}}>
+                    <div style={{fontSize:11,fontWeight:700,color:T.dim,textTransform:"uppercase",letterSpacing:0.5}}>Silver</div>
+                    <div style={{fontSize:18,fontWeight:700,color:T.text,marginTop:2}}>${fmt(metals.silver)}</div>
+                    <div style={{fontSize:12,color:T.dim}}>per oz</div>
+                  </div>
+                )}
+              </div>
+              {metals.gold && (
+                <div style={{padding:"12px 14px",borderRadius:10,
+                  background:dashboard.metalGainLoss>=0?T.greenBg:T.redBg,
+                  border:`1px solid ${dashboard.metalGainLoss>=0?T.green+"20":T.red+"20"}`}}>
+                  <div style={{fontSize:12,fontWeight:700,color:dashboard.metalGainLoss>=0?T.green:T.red,marginBottom:2}}>
+                    Your invoice at today's prices
+                  </div>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                    <div>
+                      <span style={{fontSize:18,fontWeight:700,color:dashboard.metalGainLoss>=0?T.green:T.red}}>
+                        ${fmt(dashboard.invoiceToday)}
+                      </span>
+                      <span style={{fontSize:13,color:T.dim,marginLeft:6}}>
+                        vs ${fmt(INVOICE_TOTAL)} paid
+                      </span>
+                    </div>
+                    <div style={{fontSize:15,fontWeight:700,color:dashboard.metalGainLoss>=0?T.green:T.red}}>
+                      {dashboard.metalGainLoss>=0?"+":""}${fmt(dashboard.metalGainLoss)}
+                      <div style={{fontSize:11,fontWeight:600}}>{dashboard.metalPctChange>=0?"+":""}{fmt(dashboard.metalPctChange,1)}%</div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:8}}>
+                <div style={{fontSize:11,color:T.dim}}>
+                  Invoice gold: ${fmt(INVOICE_GOLD_OZ)}/oz &middot; Silver: ${fmt(INVOICE_SILVER_OZ)}/oz
+                </div>
+                <button onClick={metals.refresh} className="km-btn-press" style={{
+                  background:"none",border:`1px solid ${T.border}`,borderRadius:6,
+                  padding:"4px 10px",fontSize:11,color:T.dim,cursor:"pointer",fontFamily:"Georgia,serif",
+                }}>
+                  {metals.loading?"...":"Refresh"}
+                </button>
+              </div>
+              {metals.error && <div style={{fontSize:11,color:T.red,marginTop:4}}>Could not fetch live price</div>}
+            </div>
+
+            {/* Price movement context */}
+            <div style={cardSt({padding:"18px 20px"})}>
+              <div style={{fontSize:11,fontWeight:700,color:T.dim,textTransform:"uppercase",letterSpacing:0.5,marginBottom:10}}>What This Means</div>
+              {metals.gold ? (
+                <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                  {[
+                    ["Gold moved", `${dashboard.metalPctChange>=0?"+":""}${fmt(dashboard.metalPctChange,1)}% since your buy`, dashboard.metalPctChange>=0?T.green:T.red],
+                    ["14KGF materials", `Would cost $${fmt(INVOICE_14KGF_COST*dashboard.goldRatio)} today`, T.text],
+                    ["925AG materials", `Would cost $${fmt(INVOICE_925AG_COST*dashboard.silverRatio)} today`, T.text],
+                    [dashboard.metalGainLoss>=0?"Your inventory gained":"Your inventory lost",
+                     `$${fmt(Math.abs(dashboard.metalGainLoss))} in material value`,
+                     dashboard.metalGainLoss>=0?T.green:T.red],
+                  ].map(([l,v,c])=>(
+                    <div key={l}>
+                      <div style={{fontSize:13,fontWeight:600,color:c}}>{l}</div>
+                      <div style={{fontSize:12,color:T.dim}}>{v}</div>
+                    </div>
+                  ))}
+                  <div style={{marginTop:4,padding:"8px 12px",borderRadius:8,background:T.bg,fontSize:12,color:T.sub}}>
+                    {dashboard.metalGainLoss>=0
+                      ? "Gold is up — your materials are worth more than you paid. Great time to sell."
+                      : "Gold dipped — your cost basis is higher than current market. Your retail markup still covers this."}
+                  </div>
+                </div>
+              ) : (
+                <div style={{fontSize:14,color:T.dim,padding:"20px 0",textAlign:"center"}}>
+                  {metals.loading ? "Fetching live metal prices..." : "Metal prices unavailable — check connection"}
+                </div>
+              )}
             </div>
           </div>
 

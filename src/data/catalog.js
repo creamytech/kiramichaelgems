@@ -59,6 +59,16 @@ export const INVOICE_COST = 3246.89;   // Material subtotal
 export const INVOICE_FREIGHT = 62.08;  // Shipping
 export const INVOICE_TOTAL = 3308.97;  // Total investment
 
+// Market prices at time of invoice (03/24/26)
+export const INVOICE_GOLD_OZ   = 4568.02;  // Gold $/oz from invoice header
+export const INVOICE_SILVER_OZ = 74.52;    // Silver $/oz from invoice header
+export const INVOICE_GF_OZ    = 4568.02;  // Gold Filled $/oz (same as gold on this invoice)
+
+// Material breakdown by metal type (approximate from invoice line items)
+// 14KGF items total cost at invoice time
+export const INVOICE_14KGF_COST = 2897.42;  // ~89% of materials are 14KGF
+export const INVOICE_925AG_COST = 349.47;   // ~11% are 925 silver
+
 // ─── INITIAL INVENTORY (JK Findings Invoice PI26-04970, shipped 03/24/26) ───
 // Chains: footage items converted to inches, pre-made chains = length * qty
 // per gram items stored in grams, everything else in "each"
