@@ -1675,12 +1675,12 @@ export default function App() {
                   },0);
                   return (
                     <div key={t.id} style={{minWidth:180,flexShrink:0,background:T.bg,border:`1px solid ${T.border}`,borderRadius:8,padding:"12px 14px"}}>
-                      <div style={{fontSize:13,fontWeight:700,color:T.text,marginBottom:3}}>{t.name}</div>
-                      <div style={{fontSize:11,color:T.dim,marginBottom:10}}>
+                      <div style={{fontSize:14,fontWeight:700,color:T.text,marginBottom:3}}>{t.name}</div>
+                      <div style={{fontSize:12,color:T.dim,marginBottom:10}}>
                         {t.items.length} items &middot; ${fmt(matCost)} material &middot; {t.markup}x
                       </div>
                       <div style={{display:"flex",gap:6}}>
-                        <button onClick={()=>loadTemplate(t)} style={{...btnPrimary({flex:1,padding:"7px 0",fontSize:12})}}>Load</button>
+                        <button onClick={()=>loadTemplate(t)} style={{...btnPrimary({flex:1,padding:"9px 0",fontSize:13})}}>Load</button>
                         <button onClick={()=>deleteTemplate(t.id)} style={{padding:"7px 9px",background:"none",border:`1px solid ${T.border}`,borderRadius:6,cursor:"pointer",color:T.dim,display:"flex",alignItems:"center"}}>
                           <Icon name="Trash" size={13}/>
                         </button>
@@ -3271,7 +3271,7 @@ export default function App() {
                         }} onMouseEnter={e=>e.currentTarget.style.background=T.accentLight}
                            onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
                           <div style={{fontSize:14,fontWeight:600,color:T.text}}>{c.name}</div>
-                          <div style={{fontSize:11,color:T.dim}}>{c.orders} order{c.orders!==1?"s":""}{c.phone?` · ${c.phone}`:""}</div>
+                          <div style={{fontSize:12,color:T.dim}}>{c.orders} order{c.orders!==1?"s":""}{c.phone?` · ${c.phone}`:""}</div>
                         </div>
                       ))}
                     </div>
