@@ -827,7 +827,7 @@ export default function App() {
     }
   }
 
-  const displayRec = checkoutRec || records[0];
+  const displayRec = checkoutRec;
   const paypalLink = (amt,note) => settings.paypal ? `https://www.paypal.me/${settings.paypal}/${amt.toFixed(2)}` : null;
   const venmoLink  = (amt,note) => settings.venmo  ? `https://venmo.com/?txn=pay&audience=private&recipients=${settings.venmo}&amount=${amt.toFixed(2)}&note=${encodeURIComponent(note)}` : null;
   const cashLink   = amt        => settings.cashapp ? `https://cash.app/${settings.cashapp.startsWith("$")?settings.cashapp:"$"+settings.cashapp}/${amt.toFixed(2)}` : null;
