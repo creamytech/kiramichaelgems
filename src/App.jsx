@@ -2116,26 +2116,6 @@ export default function App() {
                   </div>
                 </div>
 
-                {records.length>1 && (
-                  <div style={cardSt({padding:"16px"})}>
-                    <div style={{fontWeight:600,fontSize:14,marginBottom:10,color:T.sub}}>Other Orders</div>
-                    {records.filter(r=>r.id!==displayRec.id).slice(0,4).map(r=>(
-                      <div key={r.id} onClick={()=>{setCheckoutRec(r);setQrMethod(null);}}
-                        style={{padding:"9px 10px",borderRadius:7,cursor:"pointer",display:"flex",justifyContent:"space-between",transition:"background 0.12s"}}
-                        onMouseEnter={e=>e.currentTarget.style.background=T.bg}
-                        onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-                        <div>
-                          <div style={{fontSize:13,color:T.text}}>{r.buildName}</div>
-                          <div style={{fontSize:11,color:T.dim}}>{r.customer} &middot; {r.date}</div>
-                        </div>
-                        <div style={{textAlign:"right"}}>
-                          <div style={{fontSize:13,fontWeight:600,color:T.gold}}>${fmt(r.totalRetail)}</div>
-                          <span style={tagSt(r.paid?T.green:T.dim,r.paid?T.greenBg:"#EDEBF0")}>{r.paid?"Paid":"Pending"}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
               </div>
             </div>
           )}
