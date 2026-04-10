@@ -341,6 +341,7 @@ export default function App() {
 
     // Price rounding
     const roundPrice = (p) => {
+      if (p < 5) return p; // Don't round small amounts
       if (settings.priceRounding==="whole") return Math.round(p);
       if (settings.priceRounding==="99") return Math.floor(p) + 0.99;
       if (settings.priceRounding==="95") return Math.floor(p) + 0.95;
@@ -1434,7 +1435,7 @@ export default function App() {
                 <div style={{fontSize:16,fontWeight:700,color:T.text,lineHeight:1.1}}>KM Gems</div>
                 <button onClick={()=>setShowPicker(true)} style={{
                   background:"none",border:"none",cursor:"pointer",padding:0,marginTop:1,
-                  fontSize:11,color:activeShowData?T.accent:T.dim,fontWeight:500,fontFamily:"Georgia,serif",
+                  fontSize:12,color:activeShowData?T.accent:T.dim,fontWeight:500,fontFamily:"Georgia,serif",
                   display:"flex",alignItems:"center",gap:3,
                 }}>
                   {activeShowData ? <><span style={{width:5,height:5,borderRadius:"50%",background:T.green,flexShrink:0}}/>{activeShowData.name}</> : "pick show"}
@@ -1822,7 +1823,7 @@ export default function App() {
                       ...(totals.taxAmt>0?[["Total w/ tax",`$${fmt(totals.totalWithTax)}`,true]]:[]),
                     ].map(([l,v,hi])=>(
                       <div key={l} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderBottom:`1px solid ${T.border}`}}>
-                        <span style={{fontSize:13,color:l==="Discount"?T.red:hi?T.text:T.sub}}>{l}</span>
+                        <span style={{fontSize:14,color:l==="Discount"?T.red:hi?T.text:T.sub}}>{l}</span>
                         <span style={{fontSize:hi?17:14,fontWeight:hi?700:400,color:l==="Discount"?T.red:hi?T.gold:T.text}}>{v}</span>
                       </div>
                     ))}
@@ -1847,7 +1848,7 @@ export default function App() {
                                 }} onMouseEnter={e=>e.currentTarget.style.background=T.accentLight}
                                    onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
                                   <div style={{fontSize:14,fontWeight:600,color:T.text}}>{c.name}</div>
-                                  <div style={{fontSize:11,color:T.dim}}>{c.orders} order{c.orders!==1?"s":""} &middot; ${fmt(c.total)}{c.phone?` &middot; ${c.phone}`:""}</div>
+                                  <div style={{fontSize:12,color:T.dim}}>{c.orders} order{c.orders!==1?"s":""} &middot; ${fmt(c.total)}{c.phone?` &middot; ${c.phone}`:""}</div>
                                 </button>
                               ))}
                             </div>
@@ -2085,24 +2086,24 @@ export default function App() {
 
                     <div className="km-divider-shimmer" style={{margin:"12px 0"}}/>
 
-                    <div style={{fontSize:13,fontWeight:700,color:T.sub,textTransform:"uppercase",letterSpacing:0.5,marginBottom:10}}>Send Receipt</div>
+                    <div style={{fontSize:14,fontWeight:700,color:T.sub,textTransform:"uppercase",letterSpacing:0.5,marginBottom:10}}>Send Receipt</div>
                     <div style={{display:"flex",flexDirection:"column",gap:8}}>
                       {displayRec.phone && (
                         <button onClick={()=>textInvoice(displayRec)} className="km-btn-press" style={{
-                          ...btnPrimary({width:"100%",padding:"13px",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",gap:8}),
+                          ...btnPrimary({width:"100%",padding:"14px",fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",gap:8}),
                         }}>
-                          <Icon name="Cash" size={16}/>Text Receipt to {displayRec.phone}
+                          <Icon name="Cash" size={18}/>Text Receipt to {displayRec.phone}
                         </button>
                       )}
                       {displayRec.email && (
                         <button onClick={()=>emailInvoice(displayRec)} className="km-btn-press" style={{
-                          ...btnGhost(false,{width:"100%",padding:"13px",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",gap:8}),
+                          ...btnGhost(false,{width:"100%",padding:"14px",fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",gap:8}),
                         }}>
-                          <Icon name="Save" size={16}/>Email Receipt to {displayRec.email}
+                          <Icon name="Save" size={18}/>Email Receipt to {displayRec.email}
                         </button>
                       )}
                       {!displayRec.phone && !displayRec.email && (
-                        <p style={{fontSize:13,color:T.dim,textAlign:"center",padding:"8px 0"}}>No phone or email on file for this customer</p>
+                        <p style={{fontSize:14,color:T.dim,textAlign:"center",padding:"8px 0"}}>No phone or email on file for this customer</p>
                       )}
                     </div>
                   </div>
@@ -2347,7 +2348,7 @@ export default function App() {
             </div>
             {/* Progress bar: revenue vs investment */}
             <div style={{marginTop:16}}>
-              <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:T.sub,marginBottom:4}}>
+              <div style={{display:"flex",justifyContent:"space-between",fontSize:12,color:T.sub,marginBottom:4}}>
                 <span>Revenue: ${fmt(dashboard.totalRevenue)}</span>
                 <span>Goal: ${fmt(INVOICE_TOTAL)} (break even)</span>
               </div>
@@ -2380,7 +2381,7 @@ export default function App() {
             <div style={{...cardSt({padding:"18px 20px",border:`1.5px solid ${metals.gold?dashboard.metalGainLoss>=0?T.green+"40":T.red+"40":T.border}`})}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
                 <div>
-                  <div style={{fontSize:11,fontWeight:700,color:T.dim,textTransform:"uppercase",letterSpacing:0.5}}>Gold Spot</div>
+                  <div style={{fontSize:12,fontWeight:700,color:T.dim,textTransform:"uppercase",letterSpacing:0.5}}>Gold Spot</div>
                   <div style={{fontSize:26,fontWeight:700,color:T.text,marginTop:2}}>
                     {metals.gold ? `$${fmt(metals.gold)}` : metals.loading ? "Loading..." : "—"}
                   </div>
@@ -2388,7 +2389,7 @@ export default function App() {
                 </div>
                 {metals.silver && (
                   <div style={{textAlign:"right"}}>
-                    <div style={{fontSize:11,fontWeight:700,color:T.dim,textTransform:"uppercase",letterSpacing:0.5}}>Silver</div>
+                    <div style={{fontSize:12,fontWeight:700,color:T.dim,textTransform:"uppercase",letterSpacing:0.5}}>Silver</div>
                     <div style={{fontSize:18,fontWeight:700,color:T.text,marginTop:2}}>${fmt(metals.silver)}</div>
                     <div style={{fontSize:12,color:T.dim}}>per oz</div>
                   </div>
@@ -2428,12 +2429,12 @@ export default function App() {
                   {metals.loading?"...":"Refresh"}
                 </button>
               </div>
-              {metals.error && <div style={{fontSize:11,color:T.red,marginTop:4}}>Could not fetch live price</div>}
+              {metals.error && <div style={{fontSize:12,color:T.red,marginTop:4}}>Could not fetch live price</div>}
             </div>
 
             {/* Price movement context */}
             <div style={cardSt({padding:"18px 20px"})}>
-              <div style={{fontSize:11,fontWeight:700,color:T.dim,textTransform:"uppercase",letterSpacing:0.5,marginBottom:10}}>What This Means</div>
+              <div style={{fontSize:12,fontWeight:700,color:T.dim,textTransform:"uppercase",letterSpacing:0.5,marginBottom:10}}>What This Means</div>
               {metals.gold ? (
                 <div style={{display:"flex",flexDirection:"column",gap:10}}>
                   {[
@@ -2514,20 +2515,20 @@ export default function App() {
               <div style={{fontWeight:700,fontSize:16,marginBottom:14}}>Collections</div>
               <div style={{display:"flex",flexDirection:"column",gap:12}}>
                 <div style={{padding:"16px",background:T.greenBg,borderRadius:12,border:`1px solid ${T.green}20`}}>
-                  <div style={{fontSize:11,fontWeight:700,color:T.green,textTransform:"uppercase",letterSpacing:0.5}}>Collected</div>
+                  <div style={{fontSize:12,fontWeight:700,color:T.green,textTransform:"uppercase",letterSpacing:0.5}}>Collected</div>
                   <div style={{fontSize:24,fontWeight:700,color:T.green}}>${fmt(dashboard.collected)}</div>
                   <div style={{fontSize:12,color:T.sub}}>{dashboard.paidOrders.length} paid order{dashboard.paidOrders.length!==1?"s":""}</div>
                 </div>
                 {dashboard.pending>0 && (
                   <div style={{padding:"16px",background:T.accentLight,borderRadius:12,border:"1px solid #F0D06020"}}>
-                    <div style={{fontSize:11,fontWeight:700,color:T.accent,textTransform:"uppercase",letterSpacing:0.5}}>Pending</div>
+                    <div style={{fontSize:12,fontWeight:700,color:T.accent,textTransform:"uppercase",letterSpacing:0.5}}>Pending</div>
                     <div style={{fontSize:24,fontWeight:700,color:T.accent}}>${fmt(dashboard.pending)}</div>
                     <div style={{fontSize:12,color:T.sub}}>{dashboard.pendingOrders.length} unpaid order{dashboard.pendingOrders.length!==1?"s":""}</div>
                   </div>
                 )}
                 {/* Inventory status */}
                 <div style={{padding:"16px",background:T.accentLight,borderRadius:12,border:`1px solid ${T.accent}20`}}>
-                  <div style={{fontSize:11,fontWeight:700,color:T.accent,textTransform:"uppercase",letterSpacing:0.5}}>Inventory Remaining</div>
+                  <div style={{fontSize:12,fontWeight:700,color:T.accent,textTransform:"uppercase",letterSpacing:0.5}}>Inventory Remaining</div>
                   <div style={{fontSize:24,fontWeight:700,color:T.accent}}>${fmt(dashboard.invValue)}</div>
                   <div style={{fontSize:12,color:T.sub}}>{fmt(dashboard.invUsedPct,1)}% of materials used</div>
                   <div style={{height:6,background:T.border,borderRadius:3,overflow:"hidden",marginTop:8}}>
