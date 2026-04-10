@@ -102,7 +102,8 @@ export default function App() {
   const [sellers,    setSellers]    = useState([]);     // seller profiles
   const [activeSeller,setActiveSeller]=useState(null);  // current seller id
   const [sellerPicker,setSellerPicker]=useState(true);  // show on startup
-  const [editingSeller,setEditingSeller]=useState(null); // seller id being edited
+  const [editingSeller,setEditingSeller]=useState(null);
+  const [reassignOrder,setReassignOrder]=useState(null); // order id to reassign show
 
   const [loading,     setLoading]     = useState(true);
   const [tab,         setTab]         = useState("catalog");
@@ -466,6 +467,14 @@ export default function App() {
     setRecords(u); store.set("km-builds",u); dbSave("orders",u);
     if (checkoutRec?.id===id) setCheckoutRec({...checkoutRec, paid:true});
     setPaidBanner(true); setTimeout(()=>setPaidBanner(false), 2200);
+  }
+
+  function reassignToShow(orderId, showId) {
+    const show = shows.find(s=>s.id===showId);
+    const u = records.map(r=>r.id===orderId?{...r,showId:showId||null,showName:show?.name||null}:r);
+    setRecords(u); store.set("km-builds",u); dbSave("orders",u);
+    setReassignOrder(null);
+    showToast(show ? `Moved to ${show.name}` : "Moved to general sales");
   }
 
   function deleteRecord(id) {
@@ -2825,6 +2834,7 @@ export default function App() {
                       <button onClick={()=>{setCheckoutRec(r);setTab("checkout");}} className="km-btn-press" style={{...btnGhost(false,{padding:"7px 12px",fontSize:13,display:"flex",alignItems:"center",gap:5})}}><Icon name="QR" size={14}/>Checkout</button>
                       <button onClick={()=>editOrder(r)} className="km-btn-press" style={{...btnGhost(false,{padding:"7px 12px",fontSize:13,display:"flex",alignItems:"center",gap:5})}}><Icon name="Edit" size={14}/>Edit</button>
                       <button onClick={()=>duplicateOrder(r)} className="km-btn-press" style={{...btnGhost(false,{padding:"7px 12px",fontSize:13,display:"flex",alignItems:"center",gap:5})}}><Icon name="Plus" size={14}/>Copy</button>
+                      <button onClick={()=>setReassignOrder(r.id)} className="km-btn-press" style={{...btnGhost(false,{padding:"7px 12px",fontSize:13,display:"flex",alignItems:"center",gap:5})}}><Icon name="ChevronDown" size={14}/>Move</button>
                       <button onClick={()=>deleteRecord(r.id)} style={{background:"none",border:`1px solid ${T.border}`,borderRadius:6,color:T.dim,cursor:"pointer",padding:"7px 9px",display:"flex",alignItems:"center"}}>
                         <Icon name="Trash" size={14}/>
                       </button>
@@ -3274,6 +3284,37 @@ export default function App() {
       <footer style={{textAlign:"center",padding:"24px 20px",color:T.dim,fontSize:12,borderTop:`1px solid ${T.border}`,display:R.isMobile?"none":"block",letterSpacing:0.3}}>
         <span style={{opacity:0.7}}>KM Gems &middot; JK Findings Invoice PI26-04970 &middot; March 24, 2026</span>
       </footer>
+
+      {/* Reassign order to show modal */}
+      {reassignOrder && (
+        <div style={{position:"fixed",inset:0,zIndex:200,background:"rgba(0,0,0,0.55)",backdropFilter:"blur(4px)",display:"flex",alignItems:"flex-end",justifyContent:"center",animation:"km-overlayIn 0.2s ease"}}
+          onClick={()=>setReassignOrder(null)}>
+          <div style={{...cardSt(),width:"100%",maxWidth:400,borderBottomLeftRadius:0,borderBottomRightRadius:0,borderTopLeftRadius:20,borderTopRightRadius:20,padding:"24px 20px 36px",animation:"km-modalSlide 0.3s cubic-bezier(0.22,1,0.36,1)"}}
+            onClick={e=>e.stopPropagation()}>
+            <div style={{width:36,height:4,borderRadius:2,background:T.border,margin:"0 auto 16px"}}/>
+            <div style={{fontSize:18,fontWeight:700,color:T.text,marginBottom:4}}>Move to Show</div>
+            <p style={{fontSize:13,color:T.dim,marginBottom:16}}>Pick which show this order belongs to</p>
+            <div style={{display:"flex",flexDirection:"column",gap:6}}>
+              <button onClick={()=>reassignToShow(reassignOrder,null)} className="km-btn-press" style={{
+                ...btnGhost(!records.find(r=>r.id===reassignOrder)?.showId,{width:"100%",padding:"14px",fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",gap:8}),
+              }}>
+                No show — general sales
+              </button>
+              {shows.map(s=>{
+                const isCurrentShow = records.find(r=>r.id===reassignOrder)?.showId===s.id;
+                return (
+                  <button key={s.id} onClick={()=>reassignToShow(reassignOrder,s.id)} className="km-btn-press" style={{
+                    ...btnGhost(isCurrentShow,{width:"100%",padding:"14px",fontSize:15,display:"flex",alignItems:"center",justifyContent:"space-between"}),
+                  }}>
+                    <span>{s.name}</span>
+                    {isCurrentShow && <span style={{fontSize:12,color:T.green,fontWeight:700}}>Current</span>}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Toast notification */}
       {toast && (
