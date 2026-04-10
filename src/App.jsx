@@ -345,7 +345,7 @@ export default function App() {
     let totalWithTax = totalRetail + taxAmt;
 
     // Price rounding — only on the final total the customer pays
-    if (settings.priceRounding==="whole") totalWithTax = Math.round(totalWithTax);
+    if (settings.priceRounding==="whole") totalWithTax = Math.ceil(totalWithTax);
     else if (settings.priceRounding==="99") totalWithTax = Math.floor(totalWithTax) + 0.99;
     else if (settings.priceRounding==="95") totalWithTax = Math.floor(totalWithTax) + 0.95;
 
