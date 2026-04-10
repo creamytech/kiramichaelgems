@@ -339,23 +339,15 @@ export default function App() {
     let totalRetail  = Math.max(0, retailBefore-discAmt);
     let rpp          = Math.max(0,(materialCost+labor)*markup - (discountType==="%"?(materialCost+labor)*markup*(Math.min(discount,100)/100):Math.min(discount/pieces,(materialCost+labor)*markup)));
 
-    // Price rounding
-    const roundPrice = (p) => {
-      if (p < 5) return p; // Don't round small amounts
-      if (settings.priceRounding==="whole") return Math.round(p);
-      if (settings.priceRounding==="99") return Math.floor(p) + 0.99;
-      if (settings.priceRounding==="95") return Math.floor(p) + 0.95;
-      return p;
-    };
-    if (settings.priceRounding!=="none") {
-      totalRetail = roundPrice(totalRetail);
-      rpp = pieces>0 ? totalRetail/pieces : rpp;
-    }
-
-    // Tax
+    // Tax first (on unrounded amount)
     const taxRate = settings.taxEnabled ? (settings.taxRate||0)/100 : 0;
     const taxAmt = totalRetail * taxRate;
-    const totalWithTax = totalRetail + taxAmt;
+    let totalWithTax = totalRetail + taxAmt;
+
+    // Price rounding — only on the final total the customer pays
+    if (settings.priceRounding==="whole") totalWithTax = Math.round(totalWithTax);
+    else if (settings.priceRounding==="99") totalWithTax = Math.floor(totalWithTax) + 0.99;
+    else if (settings.priceRounding==="95") totalWithTax = Math.floor(totalWithTax) + 0.95;
 
     const profit       = totalRetail-subtotal;
     const margin       = totalRetail>0?(profit/totalRetail)*100:0;
