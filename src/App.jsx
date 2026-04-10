@@ -51,10 +51,10 @@ function LocationInput({ id, style }) {
       <input id={id} placeholder="Location" value={query} onChange={e=>handleChange(e.target.value)} style={style} autoComplete="off"/>
       {open && (
         <div style={{position:"absolute",top:"100%",left:0,right:0,zIndex:99,background:"#fff",border:`1px solid ${T.border}`,borderRadius:8,marginTop:2,boxShadow:T.shadow,maxHeight:180,overflowY:"auto"}}>
-          {loading && <div style={{padding:"8px 12px",fontSize:13,color:T.dim}}>Searching...</div>}
-          {!loading && results.length===0 && query.trim().length>=3 && <div style={{padding:"8px 12px",fontSize:13,color:T.dim}}>No results</div>}
+          {loading && <div style={{padding:"10px 14px",fontSize:14,color:T.dim}}>Searching...</div>}
+          {!loading && results.length===0 && query.trim().length>=3 && <div style={{padding:"10px 14px",fontSize:14,color:T.dim}}>No results</div>}
           {results.map((r,i) => (
-            <button key={i} type="button" onClick={()=>{setQuery(r);setOpen(false);setResults([]);}} style={{display:"block",width:"100%",textAlign:"left",padding:"8px 12px",fontSize:13,color:T.text,background:"transparent",border:"none",borderBottom:`1px solid ${T.border}`,cursor:"pointer",fontFamily:"Georgia,serif"}}>{r}</button>
+            <button key={i} type="button" onClick={()=>{setQuery(r);setOpen(false);setResults([]);}} style={{display:"block",width:"100%",textAlign:"left",padding:"10px 14px",fontSize:14,color:T.text,background:"transparent",border:"none",borderBottom:`1px solid ${T.border}`,cursor:"pointer",fontFamily:"Georgia,serif"}}>{r}</button>
           ))}
         </div>
       )}
@@ -134,6 +134,8 @@ export default function App() {
   const [discount,      setDiscount]      = useState(0);
   const [discountType,  setDiscountType]  = useState("%");
   const [toast,         setToast]         = useState(null);
+  const [paidBanner,    setPaidBanner]    = useState(false); // full-width PAID banner
+  const [savedOverlay,  setSavedOverlay]  = useState(false); // big success animation on order save
   const [quickSell,     setQuickSell]     = useState(null); // item for quick sell modal
   const [qsName,        setQsName]        = useState("");
   const [qsPhone,       setQsPhone]       = useState("");
@@ -438,11 +440,11 @@ export default function App() {
     const updated = [rec,...records];
     setRecords(updated); store.set("km-builds",updated); dbSave("orders",updated);
     setFlash("saved"); setTimeout(()=>setFlash(""),2500);
-    showToast("Order saved — heading to checkout");
+    setSavedOverlay(true); setTimeout(()=>setSavedOverlay(false), 1800);
     setCheckoutRec(rec);
     setBuildItems([]); setCustomerName(""); setCustomerEmail(""); setCustomerPhone("");
     setBuildName(""); setBuildNotes(""); setPieces(1); setDiscount(0);
-    setTab("checkout");
+    setTimeout(()=>setTab("checkout"), 1200);
   }
 
   function saveAsTemplate() {
@@ -470,7 +472,7 @@ export default function App() {
     const u = records.map(r=>r.id===id?{...r,paid:true}:r);
     setRecords(u); store.set("km-builds",u); dbSave("orders",u);
     if (checkoutRec?.id===id) setCheckoutRec({...checkoutRec, paid:true});
-    showToast("Marked as paid");
+    setPaidBanner(true); setTimeout(()=>setPaidBanner(false), 2200);
   }
 
   function deleteRecord(id) {
@@ -1538,11 +1540,43 @@ export default function App() {
             {CATS.map(c=>(
               <button key={c} onClick={()=>setCatFilter(c)} className="km-btn-press" style={{
                 ...btnGhost(catFilter===c),
-                padding:"7px 14px",fontSize:13,whiteSpace:"nowrap",flexShrink:0,
-              }}>{c}{c!=="All" && <span style={{...tagSt(T.dim,"#EDEBF0"),marginLeft:6,fontSize:10,padding:"2px 7px"}}>{ALL_ITEMS.filter(i=>i.cat===c).length}</span>}</button>
+                padding:"8px 14px",fontSize:14,whiteSpace:"nowrap",flexShrink:0,
+              }}>{c}{c!=="All" && <span style={{...tagSt(T.dim,"#EDEBF0"),marginLeft:6,fontSize:11,padding:"2px 7px"}}>{ALL_ITEMS.filter(i=>i.cat===c).length}</span>}</button>
             ))}
           </div>
           <div style={{display:"grid",gridTemplateColumns:`repeat(auto-fill,minmax(${R.isMobile?"160px":"260px"},1fr))`,gap:12}}>
+          {/* Saved Builds — Quick Sell */}
+          {templates.length>0 && (catFilter==="All") && (
+            <div style={{marginBottom:16}}>
+              <div style={{fontSize:15,fontWeight:700,color:T.text,marginBottom:10,display:"flex",alignItems:"center",gap:8}}>
+                <Icon name="Save" size={16} color={T.accent}/> Ready to Sell
+                <span style={tagSt()}>{templates.length}</span>
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:`repeat(auto-fill,minmax(${R.isMobile?"160px":"260px"},1fr))`,gap:10}}>
+                {templates.filter(t=>!search||t.name.toLowerCase().includes(search.toLowerCase())).map(t=>{
+                  const matCost = t.items.reduce((s,b)=>{const item=ALL_ITEMS.find(i=>i.id===b.itemId);return s+(item?item.price*b.qty:0);},0);
+                  const retail = matCost * (t.markup||6);
+                  return (
+                    <div key={t.id} className="km-card-hover km-grid-item" style={{...cardSt({padding:"16px 18px"}),border:`2px solid ${T.accent}30`}}>
+                      <div style={{fontSize:15,fontWeight:700,color:T.text,marginBottom:4}}>{t.name}</div>
+                      <div style={{fontSize:12,color:T.dim,marginBottom:8}}>{t.items.length} items</div>
+                      <div style={{fontSize:20,fontWeight:700,color:T.accent,marginBottom:10}}>${fmt(retail)}</div>
+                      <div style={{display:"flex",gap:6}}>
+                        <button onClick={()=>{loadTemplate(t);setTab("build");}} className="km-btn-press" style={{...btnPrimary({flex:1,padding:"12px",fontSize:15,borderRadius:10}),display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+                          <Icon name="Tag" size={16}/>Sell
+                        </button>
+                        <button onClick={()=>deleteTemplate(t.id)} className="km-btn-press" style={{...btnGhost(false,{padding:"12px",borderRadius:10}),display:"flex",alignItems:"center"}}>
+                          <Icon name="Trash" size={14}/>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Individual Items */}
             {catalogItems.map(item=>(
               <div key={item.id} className="km-card-hover km-grid-item" style={{...cardSt({padding:"16px 18px"}),position:"relative",cursor:"default"}}
                 onMouseEnter={e=>{e.currentTarget.style.borderColor=T.borderAcc+"60";}}
@@ -1556,11 +1590,11 @@ export default function App() {
                     onMouseLeave={e=>{e.currentTarget.style.color=T.dim;e.currentTarget.style.borderColor=T.border;}}><Icon name="Trash" size={14}/></button>}
                 </div>
                 {item.image && <img src={item.image} alt="" style={{width:"100%",height:120,objectFit:"cover",borderRadius:10,marginBottom:10,border:`1px solid ${T.border}`}}/>}
-                <div style={{fontSize:14,color:T.text,lineHeight:1.45,marginBottom:8,paddingRight:item.isCustom?48:0,fontWeight:600}}>{item.name}</div>
+                <div style={{fontSize:15,color:T.text,lineHeight:1.45,marginBottom:8,paddingRight:item.isCustom?48:0,fontWeight:600}}>{item.name}</div>
                 <div style={{display:"flex",gap:6,marginBottom:8,flexWrap:"wrap",alignItems:"center"}}>
                   <span style={tagSt()}>{item.cat}</span>
                   {item.isCustom && <span style={tagSt(T.green,T.greenBg)}>Custom</span>}
-                  <span style={{fontSize:11,color:T.dim,alignSelf:"center"}}>{item.metal}</span>
+                  <span style={{fontSize:12,color:T.dim,alignSelf:"center"}}>{item.metal}</span>
                 </div>
                 {/* Stock indicator */}
                 {(()=>{
@@ -1569,7 +1603,7 @@ export default function App() {
                   const unitLabel = item.unit==="per inch"?'"':item.unit==="per gram"?"g":"";
                   const out = stock <= 0;
                   return (
-                    <div style={{fontSize:11,fontWeight:600,marginBottom:10,padding:"5px 10px",borderRadius:8,
+                    <div style={{fontSize:12,fontWeight:600,marginBottom:10,padding:"5px 10px",borderRadius:8,
                       background:out?T.redBg:low?T.accentLight:T.greenBg,
                       color:out?T.red:low?T.accent:T.green,
                       border:`1px solid ${out?T.red+"20":low?"#B8860B20":T.green+"20"}`,
@@ -1581,25 +1615,17 @@ export default function App() {
                     </div>
                   );
                 })()}
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8,borderTop:`1px solid ${T.border}`,paddingTop:10}}>
-                  <div>
+                <div style={{borderTop:`1px solid ${T.border}`,paddingTop:10}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
                     <span style={{fontSize:R.isMobile?17:19,fontWeight:700,color:T.gold}}>${fmt(item.price * 6, 2)}</span>
-                    <span style={{fontSize:11,color:T.dim,marginLeft:4}}>{item.unit}</span>
+                    <span style={{fontSize:12,color:T.dim}}>{item.unit}</span>
                   </div>
                   <div style={{display:"flex",gap:6}}>
-                    {item.unit==="each" && getStock(item.id)>0 && (
-                      <button onClick={()=>setQuickSell(item)} className="km-btn-press" style={{
-                        ...btnPrimary({padding:"7px 12px",fontSize:12,borderRadius:8}),
-                        display:"flex",alignItems:"center",gap:4,
-                      }}>
-                        <Icon name="Tag" size={12}/>Sell
-                      </button>
-                    )}
                     <button onClick={()=>{addToBuild(item.id);setTab("build");}} className="km-btn-press" style={{
                       background:getStock(item.id)<=0?"#EDEBF0":T.accentLight,
                       color:getStock(item.id)<=0?T.dim:T.accent,
                       border:`1.5px solid ${getStock(item.id)<=0?T.border:T.borderAcc+"60"}`,
-                      borderRadius:8,padding:"7px 12px",cursor:"pointer",fontSize:12,fontWeight:600,
+                      borderRadius:8,padding:"8px 12px",cursor:"pointer",fontSize:12,fontWeight:600,
                       display:"flex",alignItems:"center",gap:4,
                     }}>
                       <Icon name="Plus" size={12}/> Build
@@ -1616,20 +1642,20 @@ export default function App() {
           <div style={{marginBottom:14}}>
             <h2 style={{margin:"0 0 6px",fontSize:R.isMobile?19:24,fontWeight:700}}>New Order</h2>
             {/* Step indicator — compact */}
-            <div style={{display:"flex",gap:3}}>
+            <div style={{display:"flex",gap:4}}>
               {[
                 {n:1, label:"Items",     done:buildItems.length>0},
                 {n:2, label:"Customer",  done:customerName.trim().length>0},
                 {n:3, label:"Save",      done:false},
               ].map(s=>(
-                <div key={s.n} style={{flex:1,display:"flex",alignItems:"center",gap:4,padding:"6px 8px",borderRadius:6,
-                  background:s.done?T.greenBg:T.bg,border:`1px solid ${s.done?T.green+"30":T.border}`,transition:"all 0.3s ease"}}>
-                  <div style={{width:18,height:18,borderRadius:"50%",fontSize:10,fontWeight:700,
+                <div key={s.n} style={{flex:1,display:"flex",alignItems:"center",gap:6,padding:"8px 10px",borderRadius:8,
+                  background:s.done?T.greenBg:T.bg,border:`1.5px solid ${s.done?T.green+"40":T.border}`,transition:"all 0.3s ease"}}>
+                  <div style={{width:24,height:24,borderRadius:"50%",fontSize:13,fontWeight:700,
                     background:s.done?T.green:T.border,color:s.done?"#fff":T.dim,
                     display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
                     {s.done?"✓":s.n}
                   </div>
-                  <span style={{fontSize:11,fontWeight:600,color:s.done?T.green:T.dim}}>{s.label}</span>
+                  <span style={{fontSize:13,fontWeight:600,color:s.done?T.green:T.dim}}>{s.label}</span>
                 </div>
               ))}
             </div>
@@ -1676,25 +1702,25 @@ export default function App() {
               </div>
               <input value={buildSearch} onChange={e=>setBuildSearch(e.target.value)} placeholder="Search items..." style={inputSt({fontSize:14})}/>
               <div style={{display:"flex",gap:4,overflowX:"auto",paddingBottom:2,WebkitOverflowScrolling:"touch",marginTop:6,marginRight:-4}}>
-                {CATS.map(c=>(<button key={c} onClick={()=>setBuildCat(c)} className="km-btn-press" style={{...btnGhost(buildCat===c),padding:"4px 8px",fontSize:11,whiteSpace:"nowrap",flexShrink:0}}>{c}</button>))}
+                {CATS.map(c=>(<button key={c} onClick={()=>setBuildCat(c)} className="km-btn-press" style={{...btnGhost(buildCat===c),padding:"6px 10px",fontSize:13,whiteSpace:"nowrap",flexShrink:0}}>{c}</button>))}
               </div>
               <div style={{overflowY:"auto",maxHeight:R.isMobile?160:440,display:"flex",flexDirection:"column",gap:3,marginTop:6}}>
                 {sidebarItems.map(item=>{
                   const inBuild = buildItems.find(b=>b.itemId===item.id);
                   return (
                     <div key={item.id} onClick={()=>addToBuild(item.id)} style={{
-                      padding:"8px 10px",background:inBuild?T.accentLight:T.bg,
-                      border:`1px solid ${inBuild?T.accent+"40":T.border}`,borderRadius:7,
+                      padding:"10px 12px",minHeight:48,background:inBuild?T.accentLight:T.bg,
+                      border:`1px solid ${inBuild?T.accent+"40":T.border}`,borderRadius:8,
                       cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",
                       transition:"all 0.15s",minWidth:0,
                     }}>
                       <div style={{minWidth:0,flex:1}}>
-                        <div style={{fontSize:13,color:T.text,lineHeight:1.3,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{item.name}</div>
-                        <div style={{fontSize:10,color:T.dim,marginTop:1}}>{item.metal} &middot; <span style={{color:isLowStock(item.id)?getStock(item.id)<=0?T.red:T.accent:T.green,fontWeight:600}}>{item.unit==="each"?getStock(item.id):fmt(getStock(item.id),1)}{item.unit==="per inch"?'"':item.unit==="per gram"?"g":""}</span></div>
+                        <div style={{fontSize:14,color:T.text,lineHeight:1.3,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{item.name}</div>
+                        <div style={{fontSize:11,color:T.dim,marginTop:2}}>{item.metal} &middot; <span style={{color:isLowStock(item.id)?getStock(item.id)<=0?T.red:T.accent:T.green,fontWeight:600}}>{item.unit==="each"?getStock(item.id):fmt(getStock(item.id),1)}{item.unit==="per inch"?'"':item.unit==="per gram"?"g":""}</span></div>
                       </div>
                       <div style={{textAlign:"right",flexShrink:0,marginLeft:8}}>
-                        <div style={{fontSize:12,fontWeight:700,color:T.accent}}>${fmt(item.price*6,2)}</div>
-                        {inBuild && <div style={{fontSize:10,fontWeight:700,color:T.accent}}>x{inBuild.qty}</div>}
+                        <div style={{fontSize:13,fontWeight:700,color:T.accent}}>${fmt(item.price*6,2)}</div>
+                        {inBuild && <div style={{fontSize:11,fontWeight:700,color:T.accent}}>x{inBuild.qty}</div>}
                       </div>
                     </div>
                   );
@@ -1723,14 +1749,14 @@ export default function App() {
                   </div>
                   {totals.lines.map(line=>(
                     <div key={line.id} style={{display:"grid",gridTemplateColumns:`1fr ${R.isMobile?"":"80px "}100px 90px 32px`,gap:8,padding:"8px 0",borderBottom:`1px solid ${T.border}`,alignItems:"center"}}>
-                      <div style={{fontSize:13,color:T.text,lineHeight:1.35}}>{line.name}{R.isMobile&&<div style={{fontSize:11,color:T.dim}}>{line.metal}</div>}</div>
+                      <div style={{fontSize:14,color:T.text,lineHeight:1.35}}>{line.name}{R.isMobile&&<div style={{fontSize:12,color:T.dim}}>{line.metal}</div>}</div>
                       {!R.isMobile && <div style={{fontSize:12,color:T.dim}}>{line.metal}</div>}
                       <div>
                         <input type="number" min="0.001" step="1" value={line.qty===""?"":line.qty}
                           onChange={e=>updateQty(line.id,e.target.value)}
                           onBlur={()=>{if(line.qty===""||line.qty<=0)setBuildItems(p=>p.filter(b=>b.itemId!==line.id));}}
                           style={{...inputSt({padding:"6px 8px",fontSize:14,textAlign:"center"})}}/>
-                        <div style={{fontSize:10,color:T.dim,textAlign:"center",marginTop:2}}>{line.unit}</div>
+                        <div style={{fontSize:11,color:T.dim,textAlign:"center",marginTop:2}}>{line.unit}</div>
                       </div>
                       <div style={{fontSize:14,fontWeight:700,color:T.gold,textAlign:"right"}}>${fmt(line.lineCost * markup)}</div>
                       <button onClick={()=>setBuildItems(p=>p.filter(b=>b.itemId!==line.id))}
@@ -1887,12 +1913,12 @@ export default function App() {
                 <div style={{background:T.goldGradient,padding:"20px 24px",color:"#fff"}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:8}}>
                     <div>
-                      <div style={{fontSize:10,letterSpacing:2,textTransform:"uppercase",opacity:0.8,marginBottom:4}}>{displayRec.paid?"Receipt":"Invoice"}</div>
+                      <div style={{fontSize:11,letterSpacing:2,textTransform:"uppercase",opacity:0.8,marginBottom:4}}>{displayRec.paid?"Receipt":"Invoice"}</div>
                       <div style={{fontSize:R.isMobile?18:22,fontWeight:700,letterSpacing:0.3}}>{displayRec.buildName}</div>
                     </div>
                     <div style={{textAlign:"right"}}>
                       <div style={{fontSize:12,opacity:0.8}}>{displayRec.date}</div>
-                      <div style={{fontSize:10,marginTop:2,padding:"3px 10px",borderRadius:20,background:displayRec.paid?"rgba(255,255,255,0.25)":"rgba(0,0,0,0.15)",fontWeight:700}}>
+                      <div style={{fontSize:12,marginTop:2,padding:"4px 12px",borderRadius:20,background:displayRec.paid?"rgba(255,255,255,0.25)":"rgba(0,0,0,0.15)",fontWeight:700}}>
                         {displayRec.paid?"PAID":"UNPAID"}
                       </div>
                     </div>
@@ -1901,7 +1927,7 @@ export default function App() {
                 {/* Customer info */}
                 <div style={{padding:"16px 24px",borderBottom:`1px solid ${T.border}`,display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
                   <div>
-                    <div style={{fontSize:11,color:T.dim,textTransform:"uppercase",letterSpacing:0.5}}>Customer</div>
+                    <div style={{fontSize:12,color:T.dim,textTransform:"uppercase",letterSpacing:0.5}}>Customer</div>
                     <div style={{fontSize:16,fontWeight:600,color:T.text,marginTop:2}}>{displayRec.customer}</div>
                   </div>
                   <div style={{textAlign:"right",fontSize:13,color:T.dim}}>
@@ -1980,15 +2006,15 @@ export default function App() {
                       <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap"}}>
                         {PAY_METHODS.map(m=>(
                           <button key={m.key} onClick={()=>setQrMethod(qrMethod===m.key?null:m.key)} className="km-btn-press" style={{
-                            flex:1, minWidth:80, padding:"11px 6px",
+                            flex:1, minWidth:90, padding:"14px 8px",
                             background:qrMethod===m.key?m.bg:T.bg,
                             color:qrMethod===m.key?"#fff":T.sub,
                             border:`2px solid ${qrMethod===m.key?m.bg:T.border}`,
-                            borderRadius:10,cursor:"pointer",fontSize:13,fontWeight:700,
-                            display:"flex",alignItems:"center",justifyContent:"center",gap:6,
+                            borderRadius:12,cursor:"pointer",fontSize:15,fontWeight:700,
+                            display:"flex",alignItems:"center",justifyContent:"center",gap:8,
                             transition:"all 0.2s cubic-bezier(0.22,1,0.36,1)",
                           }}>
-                            <Icon name={m.icon} size={16} color={qrMethod===m.key?"#fff":T.sub}/>{m.label}
+                            <Icon name={m.icon} size={20} color={qrMethod===m.key?"#fff":T.sub}/>{m.label}
                           </button>
                         ))}
                       </div>
@@ -2020,13 +2046,17 @@ export default function App() {
                     <div className="km-divider-shimmer" style={{margin:"16px 0"}}/>
 
                     <button onClick={()=>markPaid(displayRec.id)} className="km-btn-press" style={{
-                      ...btnPrimary({width:"100%",padding:"14px",fontSize:15,background:`linear-gradient(135deg, ${T.green}, #4CAF50)`,boxShadow:"0 2px 8px rgba(45,125,79,0.2)",display:"flex",alignItems:"center",justifyContent:"center",gap:8}),
+                      ...btnPrimary({width:"100%",padding:"18px 14px",fontSize:18,background:`linear-gradient(135deg, ${T.green}, #4CAF50)`,boxShadow:"0 4px 16px rgba(45,125,79,0.3)",display:"flex",alignItems:"center",justifyContent:"center",gap:10,borderRadius:14,letterSpacing:0.3}),
                     }}>
-                      <Icon name="Check" size={18}/>Mark as Paid
+                      <Icon name="Check" size={22}/>Mark as Paid
                     </button>
                     <button onClick={()=>{ if(window.confirm("Mark as paid by cash?")) markPaid(displayRec.id); }} className="km-btn-press"
-                      style={{...btnGhost(false,{width:"100%",marginTop:8,padding:"11px",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",gap:8})}}>
-                      <Icon name="Cash" size={16}/>Cash Payment
+                      style={{width:"100%",marginTop:8,padding:"16px",fontSize:16,fontWeight:700,fontFamily:"Georgia,serif",
+                        display:"flex",alignItems:"center",justifyContent:"center",gap:8,
+                        background:T.greenBg,color:T.green,border:`2px solid ${T.green}40`,borderRadius:12,cursor:"pointer",
+                        transition:"all 0.25s cubic-bezier(0.4,0,0.2,1)",
+                      }}>
+                      <Icon name="Cash" size={20}/>Cash Payment
                     </button>
 
                     {/* Square Tap to Pay */}
@@ -2166,7 +2196,7 @@ export default function App() {
 
               {/* Items list — clean, no costs visible */}
               <div style={{padding:"24px 20px 0",maxWidth:480,margin:"0 auto"}}>
-                <div style={{fontSize:11,fontWeight:700,color:"#888",textTransform:"uppercase",letterSpacing:1,marginBottom:12}}>
+                <div style={{fontSize:12,fontWeight:700,color:"#666",textTransform:"uppercase",letterSpacing:1,marginBottom:12}}>
                   {displayRec.buildName}
                 </div>
                 {displayRec.lines.map((l,i)=>(
@@ -2177,7 +2207,7 @@ export default function App() {
                   }}>
                     <div>
                       <div style={{fontSize:16,fontWeight:600,color:"#1A1A1A"}}>{l.name}</div>
-                      <div style={{fontSize:13,color:"#888",marginTop:2}}>{l.metal} &middot; qty {l.qty}</div>
+                      <div style={{fontSize:13,color:"#666",marginTop:2}}>{l.metal} &middot; qty {l.qty}</div>
                     </div>
                     <div style={{fontSize:16,fontWeight:700,color:"#1A1A1A"}}>${fmt(l.lineCost * (displayRec.markup||6))}</div>
                   </div>
@@ -2191,7 +2221,7 @@ export default function App() {
                     </div>
                   )}
                   {(displayRec.taxAmt||0)>0 && (
-                    <div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",fontSize:14,color:"#888"}}>
+                    <div style={{display:"flex",justifyContent:"space-between",padding:"4px 0",fontSize:14,color:"#666"}}>
                       <span>Tax</span><span>${fmt(displayRec.taxAmt)}</span>
                     </div>
                   )}
@@ -2202,7 +2232,7 @@ export default function App() {
                   textAlign:"center",padding:"28px 0",
                   animation:"cv-fadeUp 0.5s ease-out 0.3s both",
                 }}>
-                  <div style={{fontSize:11,fontWeight:700,color:"#888",textTransform:"uppercase",letterSpacing:1,marginBottom:8}}>
+                  <div style={{fontSize:12,fontWeight:700,color:"#666",textTransform:"uppercase",letterSpacing:1,marginBottom:8}}>
                     {displayRec.paid?"Amount Paid":"Total Due"}
                   </div>
                   <div style={{fontSize:48,fontWeight:700,color:"#8B2FC9",letterSpacing:-1,
@@ -2252,14 +2282,14 @@ export default function App() {
                       <Icon name="Check" size={28} color="#2D7D4F"/>
                     </div>
                     <div style={{fontSize:18,fontWeight:700,color:"#2D7D4F"}}>Payment Complete</div>
-                    <div style={{fontSize:14,color:"#888",marginTop:4}}>Thank you for shopping with KM Gems!</div>
+                    <div style={{fontSize:14,color:"#666",marginTop:4}}>Thank you for shopping with KM Gems!</div>
                   </div>
                 )}
 
                 {/* Footer / branding */}
                 <div style={{textAlign:"center",padding:"20px 0 40px",borderTop:"1px solid #F0ECF4"}}>
                   <img src="/IMG_7676.jpeg" alt="KM" style={{height:32,opacity:0.5,marginBottom:8}}/>
-                  <div style={{fontSize:11,color:"#AAA",letterSpacing:0.5}}>{displayRec.date}</div>
+                  <div style={{fontSize:12,color:"#888",letterSpacing:0.5}}>{displayRec.date}</div>
                 </div>
               </div>
 
@@ -3114,11 +3144,11 @@ export default function App() {
               transition:"color 0.2s ease",
             }}>
               <div style={{padding:4,borderRadius:10,background:tab===n.id?T.accentLight:"transparent",transition:"all 0.3s cubic-bezier(0.22,1,0.36,1)",transform:tab===n.id?"scale(1.1)":"scale(1)"}}>
-                <Icon name={n.icon} size={20} color={tab===n.id?T.accent:T.dim}/>
+                <Icon name={n.icon} size={24} color={tab===n.id?T.accent:T.dim}/>
               </div>
-              <span style={{fontSize:10,fontWeight:tab===n.id?700:400,fontFamily:"sans-serif",letterSpacing:tab===n.id?0.3:0,transition:"all 0.2s ease"}}>{n.label}</span>
+              <span style={{fontSize:tab===n.id?12:11,fontWeight:tab===n.id?700:500,fontFamily:"sans-serif",letterSpacing:tab===n.id?0.3:0,transition:"all 0.2s ease"}}>{n.label}</span>
               {tab===n.id && <div style={{position:"absolute",top:0,left:"50%",transform:"translateX(-50%)",width:20,height:2.5,borderRadius:2,background:T.goldGradient,animation:"km-navDot 0.3s cubic-bezier(0.22,1,0.36,1)"}}/>}
-              {n.badge>0 && <span style={{position:"absolute",top:5,right:"50%",transform:"translateX(13px)",background:n.id==="records"?T.green:T.goldGradient,color:"#fff",borderRadius:"50%",width:16,height:16,fontSize:9,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 1px 3px rgba(0,0,0,0.15)"}}>{n.badge}</span>}
+              {n.badge>0 && <span style={{position:"absolute",top:4,right:"50%",transform:"translateX(15px)",background:n.id==="records"?T.green:T.goldGradient,color:"#fff",borderRadius:"50%",width:18,height:18,fontSize:10,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 1px 3px rgba(0,0,0,0.15)"}}>{n.badge}</span>}
             </button>
           ))}
         </nav>
@@ -3286,6 +3316,44 @@ export default function App() {
         }}>
           <Icon name={toast.type==="info"?"Check":"Check"} size={16} color="#fff"/>
           {toast.msg}
+        </div>
+      )}
+
+      {/* PAID banner - full-width green, stays 2 seconds */}
+      {paidBanner && (
+        <div style={{
+          position:"fixed",top:0,left:0,right:0,zIndex:400,
+          background:"linear-gradient(135deg, #2D7D4F, #4CAF50)",
+          color:"#fff",textAlign:"center",
+          padding:"18px 20px",
+          fontSize:28,fontWeight:700,fontFamily:"Georgia,serif",letterSpacing:2,
+          boxShadow:"0 4px 20px rgba(45,125,79,0.4)",
+          animation:"km-paidBanner 2.2s cubic-bezier(0.22,1,0.36,1) both",
+          display:"flex",alignItems:"center",justifyContent:"center",gap:12,
+        }}>
+          <Icon name="Check" size={28} color="#fff"/>PAID!
+        </div>
+      )}
+
+      {/* Order saved overlay - big success animation */}
+      {savedOverlay && (
+        <div style={{
+          position:"fixed",inset:0,zIndex:350,
+          background:"rgba(45,125,79,0.15)",backdropFilter:"blur(2px)",WebkitBackdropFilter:"blur(2px)",
+          display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
+          animation:"km-overlayIn 0.2s ease",
+        }}>
+          <div style={{
+            background:"#fff",borderRadius:24,padding:"36px 48px",textAlign:"center",
+            boxShadow:"0 8px 40px rgba(45,125,79,0.25)",
+            animation:"km-successPop 0.5s cubic-bezier(0.22,1,0.36,1) both",
+          }}>
+            <div style={{width:64,height:64,borderRadius:"50%",background:T.greenBg,display:"inline-flex",alignItems:"center",justifyContent:"center",marginBottom:14,border:`3px solid ${T.green}`}}>
+              <Icon name="Check" size={32} color={T.green}/>
+            </div>
+            <div style={{fontSize:22,fontWeight:700,color:T.green,marginBottom:6}}>Order Saved!</div>
+            <div style={{fontSize:15,color:T.sub}}>Heading to checkout...</div>
+          </div>
         </div>
       )}
     </div>

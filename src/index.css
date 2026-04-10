@@ -185,10 +185,23 @@ button, a, input, select, textarea {
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Mobile touch targets - minimum 44px */
+/* Mobile touch targets - minimum 48px for senior-friendly UX */
 @media (max-width: 767px) {
-  button { min-height: 44px; }
-  input, select, textarea { min-height: 44px; font-size: 16px !important; /* prevents iOS zoom */ }
+  button { min-height: 48px; }
+  input, select, textarea { min-height: 48px; font-size: 16px !important; /* prevents iOS zoom */ }
+}
+
+/* ─── Success overlay animation ─────────────────────────────── */
+@keyframes km-successPop {
+  0%   { opacity: 0; transform: scale(0.7); }
+  50%  { opacity: 1; transform: scale(1.05); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@keyframes km-paidBanner {
+  0%   { opacity: 0; transform: translateY(-20px); }
+  15%  { opacity: 1; transform: translateY(0); }
+  85%  { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-20px); }
 }
 
 /* Better select appearance */
