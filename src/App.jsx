@@ -847,7 +847,7 @@ export default function App() {
   // Email invoice generator
   function receiptText(rec) {
     const amt = rec.totalWithTax || rec.totalRetail;
-    const lines = rec.lines.map(l => `  ${l.name} (${l.metal}) x${l.qty} — $${fmt(l.lineCost)}`).join("\n");
+    const lines = rec.lines.map(l => `  ${l.name} (${l.metal}) x${l.qty} — $${fmt(l.lineCost * (rec.markup||6))}`).join("\n");
     return `${settings.bizName}\n${rec.paid?"Receipt":"Invoice"} — ${rec.date}\n\nCustomer: ${rec.customer}\nBuild: ${rec.buildName}\n\nItems:\n${lines}\n\nSubtotal: $${fmt(rec.totalRetail)}${(rec.taxAmt||0)>0?`\nTax: $${fmt(rec.taxAmt)}`:""}${(rec.discountAmt||0)>0?`\nDiscount: -$${fmt(rec.discountAmt)}`:""}\n\n${rec.paid?"Amount Paid":"Total Due"}: $${fmt(amt)}${rec.notes?`\n\nNote: ${rec.notes}`:""}\n\nThank you for your purchase!`;
   }
 
@@ -1915,9 +1915,9 @@ export default function App() {
                     <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 0",borderBottom:i<displayRec.lines.length-1?`1px solid ${T.border}`:"none"}}>
                       <div>
                         <div style={{fontSize:14,fontWeight:600,color:T.text}}>{l.name}</div>
-                        <div style={{fontSize:12,color:T.dim,marginTop:1}}>{l.metal} &middot; {l.qty} {l.unit} @ ${fmt(l.price,4)}</div>
+                        <div style={{fontSize:12,color:T.dim,marginTop:1}}>{l.metal} &middot; qty {l.qty}</div>
                       </div>
-                      <div style={{fontSize:15,fontWeight:700,color:T.text,flexShrink:0,marginLeft:12}}>${fmt(l.lineCost)}</div>
+                      <div style={{fontSize:15,fontWeight:700,color:T.text,flexShrink:0,marginLeft:12}}>${fmt(l.lineCost * (displayRec.markup||6))}</div>
                     </div>
                   ))}
                 </div>
