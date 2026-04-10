@@ -87,7 +87,8 @@ export default function App() {
   const [darkMode, setDarkMode] = useState(() => store.get("km-darkmode") || false);
   const [pwaPrompt, setPwaPrompt] = useState(null);
   const [showPwaPrompt, setShowPwaPrompt] = useState(false);
-  const [customerExpanded, setCustomerExpanded] = useState(null); // for customer list detail
+  const [customerExpanded, setCustomerExpanded] = useState(null);
+  const [showCustSuggestions, setShowCustSuggestions] = useState(false);
   const [showCloseShowModal, setShowCloseShowModal] = useState(false);
 
   const [records,    setRecords]    = useState([]);
@@ -1799,8 +1800,42 @@ export default function App() {
                         <span style={{fontSize:hi?17:14,fontWeight:hi?700:400,color:l==="Discount"?T.red:hi?T.gold:T.text}}>{v}</span>
                       </div>
                     ))}
+                    {/* Customer info inline */}
+                    <div style={{borderTop:`1px solid ${T.border}`,marginTop:14,paddingTop:14}}>
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                        <div><label style={labelSt}>Build Name</label><input value={buildName} onChange={e=>setBuildName(e.target.value)} placeholder="e.g. Shell Necklace" style={inputSt({fontSize:14,padding:"10px 12px"})}/></div>
+                        <div style={{position:"relative"}}>
+                          <label style={labelSt}>Customer *</label>
+                          <input value={customerName} onChange={e=>{setCustomerName(e.target.value);setShowCustSuggestions(true);}} placeholder="Full name" style={inputSt({fontSize:14,padding:"10px 12px"})} autoComplete="off"/>
+                          {showCustSuggestions && customerName.length>=2 && getCustomerSuggestions(customerName).length>0 && (
+                            <div style={{position:"absolute",top:"100%",left:0,right:0,zIndex:50,background:T.card,border:`1px solid ${T.border}`,borderRadius:10,boxShadow:T.shadowLg,marginTop:4,overflow:"hidden"}}>
+                              {getCustomerSuggestions(customerName).map((c,i)=>(
+                                <button key={i} type="button" onMouseDown={e=>{
+                                  e.preventDefault();
+                                  setCustomerName(c.name);setCustomerPhone(c.phone);setCustomerEmail(c.email);
+                                  setShowCustSuggestions(false);
+                                }} style={{
+                                  display:"block",width:"100%",textAlign:"left",background:"none",border:"none",cursor:"pointer",
+                                  padding:"12px 14px",borderBottom:i<4?`1px solid ${T.border}`:"none",
+                                  fontFamily:"Georgia,serif",
+                                }} onMouseEnter={e=>e.currentTarget.style.background=T.accentLight}
+                                   onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                                  <div style={{fontSize:14,fontWeight:600,color:T.text}}>{c.name}</div>
+                                  <div style={{fontSize:11,color:T.dim}}>{c.orders} order{c.orders!==1?"s":""} &middot; ${fmt(c.total)}{c.phone?` &middot; ${c.phone}`:""}</div>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginTop:8}}>
+                        <div><label style={labelSt}>Phone</label><input type="tel" value={customerPhone} onChange={e=>setCustomerPhone(e.target.value)} placeholder="(239) 555-0123" style={inputSt({fontSize:14,padding:"10px 12px"})}/></div>
+                        <div><label style={labelSt}>Email</label><input type="email" value={customerEmail} onChange={e=>setCustomerEmail(e.target.value)} placeholder="optional" style={inputSt({fontSize:14,padding:"10px 12px"})}/></div>
+                      </div>
+                    </div>
+
                     <button onClick={saveBuild} disabled={!customerName.trim()||buildItems.length===0} className="km-btn-press" style={{
-                      ...btnPrimary({width:"100%",marginTop:18,padding:"15px",fontSize:16}),
+                      ...btnPrimary({width:"100%",marginTop:14,padding:"15px",fontSize:16}),
                       background:flash==="saved"?T.green:customerName.trim()&&buildItems.length?T.goldGradient:"#C8BBA8",
                       cursor:customerName.trim()&&buildItems.length?"pointer":"default",
                       display:"flex",alignItems:"center",justifyContent:"center",gap:8,
@@ -1808,58 +1843,16 @@ export default function App() {
                     }}>
                       {flash==="saved" ? <><Icon name="Check" size={18}/>Saved! Going to Checkout...</> : "Save Order and Checkout"}
                     </button>
-                    {!customerName.trim() && <p style={{textAlign:"center",fontSize:13,color:T.red,marginTop:8}}>Enter a customer name to save</p>}
+                    {!customerName.trim() && buildItems.length>0 && <p style={{textAlign:"center",fontSize:13,color:T.red,marginTop:6}}>Enter customer name to save</p>}
+                    {buildName.trim() && buildItems.length>0 && (
+                      <button onClick={saveAsTemplate} className="km-btn-press" style={{...btnGhost(false,{width:"100%",marginTop:8,padding:"10px",fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",gap:6})}}>
+                        <Icon name="Save" size={14}/>{tmplFlash?"Saved!":"Save as Template"}
+                      </button>
+                    )}
                   </>)}
                 </div>
               </div>
 
-              {/* Customer info — last step before saving */}
-              {buildItems.length>0 && (
-              <div style={cardSt({padding:"18px 20px"})}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,flexWrap:"wrap",gap:8}}>
-                  <div style={{fontWeight:700,fontSize:16,color:T.text}}>Customer Info</div>
-                  {buildItems.length>0 && buildName.trim() && (
-                    <button onClick={saveAsTemplate} className="km-btn-press" style={{
-                      display:"flex",alignItems:"center",gap:6,
-                      padding:"7px 14px",fontSize:13,fontWeight:600,
-                      background:tmplFlash?T.green:T.accentLight,
-                      color:tmplFlash?"#fff":T.accent,
-                      border:`1px solid ${tmplFlash?T.green:T.borderAcc}`,
-                      borderRadius:7,cursor:"pointer",transition:"all 0.2s",
-                    }}>
-                      <Icon name="Save" size={14}/>
-                      {tmplFlash?"Saved!":"Save as Template"}
-                    </button>
-                  )}
-                </div>
-                <div style={{display:"grid",gridTemplateColumns:R.isMobile?"1fr":"1fr 1fr 1fr",gap:10}}>
-                  <div><label style={labelSt}>Build Name</label><input value={buildName} onChange={e=>setBuildName(e.target.value)} placeholder="e.g. Shell Necklace" style={inputSt()}/></div>
-                  <div style={{position:"relative"}}>
-                    <label style={labelSt}>Customer Name *</label>
-                    <input value={customerName} onChange={e=>setCustomerName(e.target.value)} placeholder="Full name" style={inputSt()} autoComplete="off"/>
-                    {customerName.length>=2 && getCustomerSuggestions(customerName).length>0 && (
-                      <div style={{position:"absolute",top:"100%",left:0,right:0,zIndex:50,background:T.card,border:`1px solid ${T.border}`,borderRadius:10,boxShadow:T.shadowLg,marginTop:4,overflow:"hidden"}}>
-                        {getCustomerSuggestions(customerName).map((c,i)=>(
-                          <div key={i} onClick={()=>{setCustomerName(c.name);setCustomerPhone(c.phone);setCustomerEmail(c.email);}} style={{
-                            padding:"10px 14px",cursor:"pointer",borderBottom:i<4?`1px solid ${T.border}`:"none",
-                            transition:"background 0.1s",
-                          }} onMouseEnter={e=>e.currentTarget.style.background=T.accentLight}
-                             onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-                            <div style={{fontSize:14,fontWeight:600,color:T.text}}>{c.name}</div>
-                            <div style={{fontSize:11,color:T.dim}}>{c.orders} order{c.orders!==1?"s":""} · ${fmt(c.total)} spent{c.phone?` · ${c.phone}`:""}</div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  <div><label style={labelSt}>Phone</label><input type="tel" value={customerPhone} onChange={e=>setCustomerPhone(e.target.value)} placeholder="(239) 555-0123" style={inputSt()}/></div>
-                </div>
-                <div style={{display:"grid",gridTemplateColumns:R.isMobile?"1fr":"1fr 1fr",gap:10,marginTop:10}}>
-                  <div><label style={labelSt}>Email</label><input type="email" value={customerEmail} onChange={e=>setCustomerEmail(e.target.value)} placeholder="email@example.com" style={inputSt()}/></div>
-                  <div><label style={labelSt}>Order Date</label><input value={orderDate} onChange={e=>setOrderDate(e.target.value)} style={inputSt()}/></div>
-                </div>
-              </div>
-              )}
             </div>
           </div>
         </div>)}
